@@ -1,0 +1,369 @@
+@import "tailwindcss";
+
+/* Tailwind v4: el variant `dark:` por defecto sigue prefers-color-scheme del
+ * sistema operativo. Esta app decide el tema con la clase `.dark` en <html>
+ * (ver context/ThemeContext.jsx), así que redefinimos el variant para que
+ * dark: reaccione a esa clase y no al SO. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* === Colores del diseño TraveXperience === */
+  --color-primary: #041627;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #1a2b3c;
+  --color-on-primary-container: #8192a7;
+  --color-primary-fixed: #d2e4fb;
+  --color-primary-fixed-dim: #b7c8de;
+  --color-on-primary-fixed: #0b1d2d;
+  --color-on-primary-fixed-variant: #38485a;
+  --color-inverse-primary: #b7c8de;
+
+  --color-secondary: #775a00;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #fec72c;
+  --color-on-secondary-container: #6f5400;
+  --color-secondary-fixed: #ffdf98;
+  --color-secondary-fixed-dim: #f5bf22;
+  --color-on-secondary-fixed: #251a00;
+  --color-on-secondary-fixed-variant: #5a4300;
+
+  --color-tertiary: #211200;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #38260b;
+  --color-on-tertiary-container: #a88c69;
+  --color-tertiary-fixed: #feddb5;
+  --color-tertiary-fixed-dim: #e1c29b;
+  --color-on-tertiary-fixed: #281802;
+  --color-on-tertiary-fixed-variant: #584326;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-surface: #f8f9fa;
+  --color-on-surface: #191c1d;
+  --color-surface-variant: #e1e3e4;
+  --color-on-surface-variant: #44474c;
+  --color-surface-bright: #f8f9fa;
+  --color-surface-dim: #d9dadb;
+  --color-surface-tint: #4f6073;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f3f4f5;
+  --color-surface-container: #edeeef;
+  --color-surface-container-high: #e7e8e9;
+  --color-surface-container-highest: #e1e3e4;
+
+  --color-background: #f8f9fa;
+  --color-on-background: #191c1d;
+
+  --color-outline: #74777d;
+  --color-outline-variant: #c4c6cd;
+
+  --color-inverse-surface: #2e3132;
+  --color-inverse-on-surface: #f0f1f2;
+
+  /* === Fuente ===
+   * `font-display-lg`, `font-headline-lg` y `font-body-md` ya se usaban en varios
+   * componentes (Header, Inicio, infoCards, favoritos...) pero nunca tuvieron un
+   * `--font-*` correspondiente, así que Tailwind los ignoraba y todo cayó siempre
+   * en el sans-serif genérico. Fraunces (serif editorial, cálida) para títulos y
+   * hero le da a la marca una personalidad propia; Inter se queda para el texto
+   * de interfaz, donde la legibilidad en tamaños chicos importa más. */
+  --font-sans: 'Inter', 'Outfit', sans-serif;
+  --font-display-lg: 'Fraunces', 'Outfit', serif;
+  --font-headline-lg: 'Fraunces', 'Outfit', serif;
+  --font-body-md: 'Inter', 'Outfit', sans-serif;
+}
+
+/*
+ * === Modo oscuro ===
+ * Se activa agregando la clase `.dark` al <html> (ver context/ThemeContext.jsx).
+ * Los colores de marca (primary/secondary/tertiary/error) se mantienen para no
+ * perder identidad visual; lo que cambia es el grupo surface/background/outline,
+ * que es lo que realmente necesita invertirse para que el texto siga siendo legible.
+ */
+.dark {
+  --color-surface: #10151b;
+  --color-on-surface: #e7e9ec;
+  --color-surface-variant: #2b333d;
+  --color-on-surface-variant: #b7c0cb;
+  --color-surface-bright: #1b222a;
+  --color-surface-dim: #0b0f14;
+  --color-surface-tint: #b7c8de;
+  --color-surface-container-lowest: #05080b;
+  --color-surface-container-low: #12181f;
+  --color-surface-container: #171e26;
+  --color-surface-container-high: #1f2830;
+  --color-surface-container-highest: #29323c;
+
+  --color-background: #0b0f14;
+  --color-on-background: #e7e9ec;
+
+  --color-outline: #8a93a0;
+  --color-outline-variant: #333d48;
+
+  --color-inverse-surface: #e7e9ec;
+  --color-inverse-on-surface: #191c1d;
+}
+
+/* --color-primary (#041627, azul marca) se queda igual en claro y oscuro a
+ * propósito, para que el header y los botones llenos (bg-primary +
+ * on-primary) mantengan su identidad de marca en ambos temas — así estaba
+ * originalmente y así se queda.
+ *
+ * El problema real era otro: ese mismo azul casi negro usado como TEXTO o
+ * BORDE suelto (sin un bg-primary detrás), por ejemplo "Ver más" o el
+ * borde de un input enfocado, quedaba invisible sobre un fondo que en modo
+ * oscuro también se vuelve casi negro. Por eso, solo en esos dos casos
+ * puntuales (.text-primary y .border-primary) se usa un azul claro en modo
+ * oscuro — el resto del diseño (fondos, botones, header) no cambia.
+ */
+.dark .text-primary {
+  color: var(--color-inverse-primary);
+}
+.dark .border-primary {
+  border-color: var(--color-inverse-primary);
+}
+
+/* === Base styles === */
+html, body {
+  margin: 0;
+  height: 100%;
+  scroll-behavior: smooth;
+  font-family: var(--font-sans);
+  /* Sin esto, el "hueco" que el navegador pinta al hacer overscroll (el gesto
+     de deslizar con dos dedos en el trackpad, que Chrome interpreta como
+     "ir atrás"/"ir adelante") se ve blanco puro sin importar el tema activo,
+     porque html/body nunca tenían un color de fondo propio: solo lo tenían
+     elementos sueltos vía las clases bg-surface/bg-background. */
+  background-color: var(--color-background);
+  
+}
+
+/* Evita que el swipe horizontal del trackpad dispare la navegación
+   atrás/adelante del navegador (y el destello en blanco que la acompaña)
+   dentro del contenido de la app; el scroll vertical normal no se toca. */
+html {
+  overscroll-behavior-x: none;
+}
+
+html.dark, html.dark body {
+  color-scheme: dark;
+}
+
+body, .bg-surface, .bg-background {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#root {
+  min-height: 100%;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* === Material Symbols === */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
+/* === Glass effect === */
+.glass-effect {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* === Layout helpers === */
+.page-center {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.icon-sm { font-size: 20px; }
+.icon-md { font-size: 24px; }
+
+/*
+ * Los íconos de Material Symbols heredan `color: currentColor`, pero varios
+ * botones inactivos usaban texto/opacidad muy claros (ej. blanco/60% sobre
+ * blanco/90%) y el ícono prácticamente desaparecía. Estas clases fijan un
+ * color con contraste garantizado tanto para el estado activo como inactivo.
+ */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  /* Todos los chips arrancan del mismo tamaño (mismo padding/tipografía);
+     solo el que está seleccionado "crece" con transform, así el resto de
+     la fila no se recorre ni cambia de tamaño al elegir un filtro. */
+  transform: scale(1);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.filter-chip .material-symbols-outlined {
+  font-size: 17px;
+}
+.filter-chip-inactive {
+  background-color: rgba(255, 255, 255, 0.82);
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  box-shadow: 0 4px 10px -6px color-mix(in srgb, var(--color-primary) 35%, transparent);
+}
+.filter-chip-inactive:hover {
+  background-color: rgba(255, 255, 255, 0.94);
+  border-color: color-mix(in srgb, var(--color-primary) 32%, transparent);
+  transform: scale(1.03);
+}
+.dark .filter-chip-inactive {
+  /* Sobre fondo oscuro, la píldora "sin seleccionar" ya no puede fingir que
+   * es blanca (se perdería contra el fondo/mapa oscuro): usa un contenedor
+   * oscuro con texto claro en vez de blanco+texto-oscuro. */
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--color-on-surface);
+}
+.dark .filter-chip-inactive:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+.filter-chip-active {
+  background-color: var(--color-secondary-container);
+  color: var(--color-on-secondary-container);
+  border-color: var(--color-secondary-container);
+  font-weight: 800;
+  transform: scale(1.08);
+  box-shadow: 0 8px 22px -10px color-mix(in srgb, var(--color-secondary-container) 62%, transparent);
+}
+
+.magazine-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .magazine-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+}
+
+/* === Animations === */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes horizontalScroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes heartPop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.35); }
+  60%  { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-horizontal-scroll {
+  animation: horizontalScroll 30s linear infinite;
+}
+
+/* Transición sutil al cambiar de página dentro de Home.jsx (SPA con router por hash). */
+.animate-page-in {
+  animation: pageIn 0.35s ease-out forwards;
+}
+
+/* Entrada en cascada para tarjetas de listas (favoritos, resultados cercanos, reseñas). */
+.animate-scale-in {
+  animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+/* Feedback al marcar/desmarcar un favorito. */
+.animate-heart-pop {
+  animation: heartPop 0.4s ease-out;
+}
+
+/* === Scrollbar ===
+ * Se piden las páginas sin la barra de scroll "de sistema" (ancha, gris,
+ * siempre visible) que se veía sobre todo en listas largas (sidebar del
+ * mapa, itinerario, tablas de Admin). El scroll sigue funcionando igual,
+ * solo se oculta la barra visual. */
+/* Transición suave al cambiar de modo claro/oscuro (antes era un cambio
+ * seco de un frame a otro; ahora los colores se desvanecen). */
+html,
+body {
+  transition: background-color 0.35s ease, color 0.35s ease;
+}
+/* La clase "fill-1" se usaba por toda la app (corazón de favoritos, estrellas,
+ * etc.) esperando que rellenara el ícono de Material Symbols, pero nunca
+ * existió como regla real — por eso el corazón de favoritos solo cambiaba
+ * de color sin "pintarse" completo. Aquí sí existe de verdad. */
+.fill-1 {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+}
+
+html {
+  scrollbar-width: none; /* Firefox */
+}
+html::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
