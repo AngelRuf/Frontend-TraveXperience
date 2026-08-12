@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import useModalScrollLock from '../../hooks/useModalScrollLock.jsx';
 import AdminLayout from '../../components/adminLayout.jsx';
 import { AdminErrorBanner } from '../../components/adminAsyncState.jsx';
 import {
@@ -124,6 +125,8 @@ function validateCardField(field, value) {
 
 // ---------- Modal Genérico Mejorado ----------
 function Modal({ title, icon, onClose, children }) {
+  useModalScrollLock(true);
+
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto">
       <div className="bg-surface border border-solid border-outline-variant/30 rounded-3xl w-full max-w-md p-6 md:p-8 relative shadow-2xl animate-scale-in mt-12 md:mt-20 max-h-[calc(100vh-8rem)] overflow-y-auto">

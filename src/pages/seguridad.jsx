@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import useModalScrollLock from '../hooks/useModalScrollLock.jsx';
 import Header from '../components/header';
 import Footer from '../components/footer';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -62,20 +63,7 @@ function Toggle({ checked, onChange, disabled = false }) {
 
 // Modal Genérico Premium
 function Modal({ title, icon, iconColor = 'text-yellow-500', iconBg = 'bg-yellow-500/10', onClose, children }) {
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    if (!window.__openModalCount) window.__openModalCount = 0;
-    window.__openModalCount += 1;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    window.scrollTo({ top: 0, behavior: 'auto' });
-    return () => {
-      window.__openModalCount = Math.max(0, (window.__openModalCount || 1) - 1);
-      if (!window.__openModalCount) {
-        document.body.style.overflow = prevOverflow || '';
-      }
-    };
-  }, []);
+  useModalScrollLock(true);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import useModalScrollLock from '../../hooks/useModalScrollLock.jsx';
 import AdminLayout from '../../components/adminLayout.jsx';
 import * as adminService from '../../services/adminService';
 import { getPlaceCategories, sortCategoriesBeachLast, humanizeCategoryLabel } from '../../services/placesService';
@@ -47,6 +48,8 @@ function AdminInventario({ onNavigate }) {
   const [deleting, setDeleting] = useState(false);
 
   const [toast, setToast] = useState(null);
+
+  useModalScrollLock(modalOpen || Boolean(deleteTarget));
   
   const showToast = (msg) => {
     setToast(msg);

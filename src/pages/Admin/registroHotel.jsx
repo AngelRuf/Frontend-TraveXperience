@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import useModalScrollLock from '../../hooks/useModalScrollLock.jsx';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -65,6 +66,8 @@ function AdminHoteles({ onNavigate }) {
   const [deletingHotel, setDeletingHotel] = useState(false);
 
   const [isAddRoomModalOpen, setIsAddRoomModalOpen] = useState(false);
+
+  useModalScrollLock(Boolean(deleteTarget) || isAddRoomModalOpen);
   const [newRoomName, setNewRoomName] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');

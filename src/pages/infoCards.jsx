@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import useModalScrollLock from '../hooks/useModalScrollLock.jsx';
 import WeatherWidget from '../components/WeatherWidget.jsx';
 import AddToItineraryModal from '../components/AddToItineraryModal.jsx';
 import Toast from '../components/Toast.jsx';
@@ -47,6 +48,8 @@ const FILLED_ICON_STYLE = { fontVariationSettings: "'FILL' 1, 'wght' 500, 'GRAD'
  *  contenedor ancestro con `transform` (p.ej. animaciones de transición de
  *  página) rompa el `position: fixed` y empuje el modal fuera de lugar. */
 function ImageLightbox({ images, index, onClose, onNavigate }) {
+  useModalScrollLock(true);
+
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === 'Escape') onClose();
@@ -54,12 +57,8 @@ function ImageLightbox({ images, index, onClose, onNavigate }) {
       if (e.key === 'ArrowLeft') onNavigate((index - 1 + images.length) % images.length);
     }
     document.addEventListener('keydown', handleKeyDown);
-    // Evita que la página de fondo haga scroll mientras el lightbox está abierto.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
     };
   }, [index, images.length, onClose, onNavigate]);
 
@@ -145,6 +144,8 @@ function HotelDetail({ onNavigate, hotel: place }) {
   const [showToast, setShowToast] = useState(false);
   const [showItineraryModal, setShowItineraryModal] = useState(false);
   const [itineraryToast, setItineraryToast] = useState(null);
+
+  useModalScrollLock(showItineraryModal);
 
   // Lightbox de la galería de fotos
   const [lightboxIndex, setLightboxIndex] = useState(null); // null = cerrado

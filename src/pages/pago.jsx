@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import useModalScrollLock from '../hooks/useModalScrollLock.jsx';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import Layout from '../components/Layout.jsx';
@@ -154,6 +155,8 @@ function CheckoutForm({ onNavigate, hotel }) {
   const [serverError, setServerError] = useState('');
   const [savedCards, setSavedCards] = useState([]);
   const [savedCardsStatus, setSavedCardsStatus] = useState('loading');
+
+  useModalScrollLock(status === 'success');
 
   // Matemáticas dinámicas para el resumen del pedido
   const total = hotel?.price || 0;

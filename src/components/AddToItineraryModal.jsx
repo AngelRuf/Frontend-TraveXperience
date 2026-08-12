@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import useModalScrollLock from '../hooks/useModalScrollLock.jsx';
 import * as itineraryService from '../services/itineraryService';
 
 /** "14:30" (input type=time) -> "2:30 PM" (formato que usa el itinerario). */
@@ -22,6 +23,8 @@ function AddToItineraryModal({ place, userId, isOpen, onClose, onAdded }) {
   const [time, setTime] = useState('12:00');
   const [addingNewDay, setAddingNewDay] = useState(false);
   const [newDayTitle, setNewDayTitle] = useState('');
+
+  useModalScrollLock(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;

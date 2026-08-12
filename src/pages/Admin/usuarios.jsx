@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import useModalScrollLock from '../../hooks/useModalScrollLock.jsx';
 import AdminLayout from '../../components/adminLayout.jsx';
 import Toast from '../../components/Toast.jsx';
 import * as adminService from '../../services/adminService';
@@ -49,6 +50,8 @@ function AdminUsuarios({ onNavigate }) {
   const [changingRole, setChangingRole] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); 
   const [deleting, setDeleting] = useState(false);
+
+  useModalScrollLock(Boolean(roleTarget) || Boolean(deleteTarget));
   
   const [toast, setToast] = useState(null);
   const [toastError, setToastError] = useState(null);

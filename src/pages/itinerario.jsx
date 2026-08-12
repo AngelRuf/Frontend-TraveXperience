@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import useModalScrollLock from '../hooks/useModalScrollLock.jsx';
 import WeatherWidget from '../components/WeatherWidget.jsx';
 import { getNearbyPlaces, getPlaceCategories, sortCategoriesBeachLast, getCurrentPosition } from '../services/placesService';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -168,31 +169,10 @@ function AwayFromHomePlanner({ onNavigate }) {
 
   const [eventModalTarget, setEventModalTarget] = useState(null);
 
-  // Global modal open watcher: lock body scroll when any modal is open and scroll to top
-  const _prevModalCount = useRef(0);
-  const _prevBodyOverflow = useRef('');
   const modalOpenCount =
     Number(showAddDayModal) + Number(showTripMetaEditor) + Number(showNewTripModal) + (eventModalTarget ? 1 : 0);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!window.__openModalCount) window.__openModalCount = 0;
-    // opened
-    if (modalOpenCount > 0 && _prevModalCount.current === 0) {
-      window.__openModalCount += 1;
-      _prevBodyOverflow.current = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      window.scrollTo({ top: 0, behavior: 'auto' });
-    }
-    // closed all
-    if (modalOpenCount === 0 && _prevModalCount.current > 0) {
-      window.__openModalCount = Math.max(0, (window.__openModalCount || 1) - 1);
-      if (!window.__openModalCount) {
-        document.body.style.overflow = _prevBodyOverflow.current || '';
-      }
-    }
-    _prevModalCount.current = modalOpenCount;
-  }, [modalOpenCount]);
+  useModalScrollLock(modalOpenCount > 0);
 
   const handleAddEventToActiveDay = (place) => {
     setEventModalTarget(place);

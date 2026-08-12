@@ -33,6 +33,8 @@ function AdminResenas({ onNavigate }) {
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState(null);
 
+  useModalScrollLock(Boolean(deleteTarget));
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast((c) => (c === msg ? null : c)), 3000);
