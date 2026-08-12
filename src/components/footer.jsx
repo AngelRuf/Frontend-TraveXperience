@@ -79,7 +79,7 @@ function Footer() {
           <div className="lg:col-span-1">
             <div className="flex items-center gap-2.5 mb-4">
               <img
-                src="/src/assets/logo_transparente.png"
+                src="/logo_transparente.png"
                 alt="TraveXperience"
                 className="h-10 w-10 object-contain"
               />

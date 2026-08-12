@@ -33,7 +33,7 @@ function Header({ isLoggedIn = false, onNavigate, currentPage = 'landing', curre
             className="flex items-center gap-2 cursor-pointer selection:bg-transparent"
           >
             <img 
-              src="/src/assets/logo_transparente.png" 
+              src="/logo_transparente.png" 
               alt="TraveXperience" 
               className="h-12 w-12 object-contain"
             />
