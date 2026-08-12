@@ -587,8 +587,8 @@ function AwayFromHomePlanner({ onNavigate }) {
 
       {/* Nuevo Viaje */}
       {showNewTripModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-surface border border-outline-variant/30 rounded-3xl w-full max-w-md p-8 relative shadow-2xl animate-scale-in">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="bg-surface border border-outline-variant/30 rounded-3xl w-full max-w-md p-8 relative shadow-2xl animate-scale-in mt-12 md:mt-20 max-h-[calc(100vh-8rem)] overflow-y-auto">
             <button onClick={() => setShowNewTripModal(false)} className="absolute top-5 right-5 w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer border-none">
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>

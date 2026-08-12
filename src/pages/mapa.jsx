@@ -448,7 +448,7 @@ function InteractiveMap({ onNavigate }) {
           <MapContainer
             center={center}
             zoom={15}
-            style={{ height: '100%', width: '100%', zIndex: 0 }}
+            style={{ height: '100%', width: '100%' }}
             zoomControl={false}
           >
             <TileLayer
@@ -617,6 +617,14 @@ function InteractiveMap({ onNavigate }) {
         }
         .leaflet-container a.leaflet-popup-close-button:hover {
           color: #eab308;
+        }
+        /* Evita que el switcher de Claro/Oscuro/Satélite y los controles de zoom
+           corten o tapen los popups de los marcadores y la tarjeta del lugar. */
+        .leaflet-popup-pane {
+          z-index: 700 !important;
+        }
+        .leaflet-marker-pane {
+          z-index: 600 !important;
         }
       `}} />
     </div>

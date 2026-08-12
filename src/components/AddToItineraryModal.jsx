@@ -53,7 +53,7 @@ function AddToItineraryModal({ place, userId, isOpen, onClose, onAdded }) {
 
   return (
     <div className="fixed inset-0 z-[1100] bg-primary/40 backdrop-blur-md flex items-start justify-center px-4 pt-20 pb-6 overflow-y-auto no-scrollbar animate-fade-in">
-      <div className="bg-surface-container-lowest w-full max-w-sm rounded-2xl shadow-2xl p-7 animate-scale-in">
+      <div className="bg-surface-container-lowest w-full max-w-sm rounded-2xl shadow-2xl p-7 animate-scale-in border border-solid border-outline-variant/30">
         <div className="flex items-start justify-between gap-3 mb-1">
           <div className="flex items-center gap-3 min-w-0">
             {place.image && (
