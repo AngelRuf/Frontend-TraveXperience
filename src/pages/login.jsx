@@ -119,30 +119,45 @@ function Login({ onNavigate, onLoginSuccess }) {
   };
 
   return (
-    <div className="bg-surface text-on-surface font-sans selection:bg-secondary-container min-h-screen flex flex-col justify-between">
-      <main className="flex-grow flex items-center justify-center pt-24 pb-12 px-6">
-        <div className="w-full max-w-[480px] space-y-8 animate-fade-in-up">
+    <div className="auth-page-shell relative text-on-surface font-sans selection:bg-yellow-500/30 min-h-screen flex flex-col justify-between overflow-hidden">
+      <div className="auth-ambient auth-ambient-one" />
+      <div className="auth-ambient auth-ambient-two" />
+      <div className="auth-plane auth-plane-left">
+        <span className="material-symbols-outlined">flight</span>
+      </div>
+      <div className="auth-plane auth-plane-right">
+        <span className="material-symbols-outlined">flight_takeoff</span>
+      </div>
+
+      <main className="flex-grow flex items-center justify-center pt-24 pb-12 px-6 relative z-10">
+        <div className="auth-page-card w-full max-w-[480px] backdrop-blur-2xl rounded-[30px] border p-8 sm:p-10 shadow-2xl space-y-8 animate-fade-in-up">
           
           <div className="text-center space-y-2 animate-fade-in-up" style={{ animationDelay: '40ms' }}>
-            <h1 className="text-5xl font-bold text-on-surface">Te extrañamos</h1>
-            <p className="text-base text-on-surface-variant">Inicia sesión para continuar planificando.</p>
+            {/* 🔠 Jerarquía Tipográfica Extrema (Pilar 6) */}
+            <h1 className="text-4xl sm:text-5xl font-black text-on-surface tracking-tight">
+              Te extrañamos
+            </h1>
+            <p className="text-base text-on-surface-variant font-medium">
+              Inicia sesión para continuar planificando.
+            </p>
           </div>
 
           <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-            <div className="space-y-4">
+            <div className="space-y-5">
               
               {/* Email */}
               <div className="space-y-1 group animate-fade-in-up" style={{ animationDelay: '80ms' }}>
-                <label className="text-xs font-semibold text-on-surface-variant uppercase group-focus-within:text-primary dark:group-focus-within:text-white transition-colors block" 
+                <label 
+                  className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest group-focus-within:text-yellow-500 transition-colors block" 
                   htmlFor="email"
                 >
                   Correo Electrónico
                 </label>
                 <input 
-                  className={`w-full bg-transparent border-b py-3 px-1 text-base focus:outline-none transition-colors placeholder:text-outline/40 ${
+                  className={`auth-input w-full border-b py-3 px-1 text-base focus:outline-none transition-colors ${
                     errors.email && touched.email
-                      ? 'border-error focus:border-error'
-                      : 'border-outline-variant focus:border-primary dark:focus:border-white'
+                      ? 'border-error focus:border-error text-error'
+                      : 'border-outline-variant/50 focus:border-yellow-500'
                   }`}
                   id="email"
                   name="email"
@@ -164,15 +179,15 @@ function Login({ onNavigate, onLoginSuccess }) {
 
               {/* Password */}
               <div className="space-y-1 group animate-fade-in-up" style={{ animationDelay: '120ms' }}>
-                <label className="text-xs font-semibold text-on-surface-variant uppercase group-focus-within:text-primary dark:group-focus-within:text-white transition-colors block">
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest group-focus-within:text-yellow-500 transition-colors block">
                   Contraseña
                 </label>
                 <div className="relative">
                   <input 
-                    className={`w-full bg-transparent border-b py-3 px-1 text-base focus:outline-none transition-colors placeholder:text-outline/40 ${
+                    className={`auth-input w-full border-b py-3 px-1 text-base focus:outline-none transition-colors pr-10 ${
                       errors.password && touched.password
-                        ? 'border-error focus:border-error'
-                        : 'border-outline-variant focus:border-primary dark:focus:border-white'
+                        ? 'border-error focus:border-error text-error'
+                        : 'border-outline-variant/50 focus:border-yellow-500'
                     }`}
                     id="password" 
                     name="password"
@@ -184,9 +199,8 @@ function Login({ onNavigate, onLoginSuccess }) {
                     aria-invalid={!!(errors.password && touched.password)}
                     aria-describedby="password-error"
                   />
-                  {/* ICONO DEL OJITO CON BRILLO EN HOVER */}
                   <button 
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant/60 dark:text-slate-400 hover:text-primary dark:hover:text-white dark:hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-300 bg-transparent border-none cursor-pointer" 
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant/60 hover:text-yellow-500 dark:hover:drop-shadow-[0_0_8px_rgba(234,179,8,0.8)] transition-all duration-300 bg-transparent border-none cursor-pointer active:scale-90" 
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
@@ -206,13 +220,12 @@ function Login({ onNavigate, onLoginSuccess }) {
                       </p>
                     )}
                   </div>
-                  {/* ENLACE OLVIDASTE CONTRASEÑA CON BRILLO EN HOVER */}
                   <a 
                     onClick={(e) => {
                       e.preventDefault();
                       if (onNavigate) onNavigate('forgot-password');
                     }}
-                    className="text-xs text-on-surface-variant/80 dark:text-slate-300 hover:text-primary dark:hover:text-white dark:hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.6)] underline underline-offset-2 cursor-pointer transition-all duration-300 mt-1" 
+                    className="text-xs font-semibold text-on-surface-variant/80 hover:text-yellow-500 dark:hover:drop-shadow-[0_0_5px_rgba(234,179,8,0.6)] underline underline-offset-2 cursor-pointer transition-all duration-300 mt-1" 
                     href="#forgot-password"
                   >
                     ¿Olvidaste tu contraseña?
@@ -224,11 +237,13 @@ function Login({ onNavigate, onLoginSuccess }) {
             <Captcha onVerify={setCaptchaOk} resetSignal={captchaResetSignal} />
 
             <div className="pt-4 space-y-6 animate-fade-in-up" style={{ animationDelay: '160ms' }}>
+              
+              {/* 🕹️ Micro-interacciones Táctiles y Acentos Vibrantes (Pilares 3, 4 y 5) */}
               <button 
-                className={`w-full py-4 rounded-full text-lg font-bold transition-all duration-300 active:scale-[0.98] shadow-sm flex items-center justify-center gap-2 cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed ${
+                className={`w-full py-4 rounded-2xl text-lg font-bold transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed border border-white/10 ${
                   status === 'success'
                     ? 'bg-secondary-container text-black'
-                    : 'bg-primary text-on-primary hover:bg-opacity-90'
+                    : 'bg-yellow-500 text-black hover:bg-yellow-400 hover:-translate-y-1 hover:shadow-[0_12px_40px_rgba(234,179,8,0.25)]'
                 }`} 
                 type="submit"
                 disabled={status === 'loading'}
@@ -254,11 +269,11 @@ function Login({ onNavigate, onLoginSuccess }) {
                     e.preventDefault();
                     if (onNavigate) onNavigate('register');
                   }}
-                  className="text-base text-on-surface-variant" 
+                  className="text-sm font-medium text-on-surface-variant" 
                   href="#register"
                 >
                   ¿No tienes una cuenta?{' '}
-                  <span className="text-primary dark:text-white font-bold hover:text-secondary dark:hover:text-blue-300 transition-colors underline underline-offset-4 decoration-primary/40 cursor-pointer">
+                  <span className="text-yellow-500 font-bold hover:text-yellow-400 transition-colors underline underline-offset-4 decoration-yellow-500/40 cursor-pointer">
                     Regístrate
                   </span>
                 </a>
@@ -266,11 +281,12 @@ function Login({ onNavigate, onLoginSuccess }) {
             </div>
           </form>
 
-          <div className="flex items-center gap-3 text-xs font-semibold text-on-surface-variant/60 uppercase tracking-wider">
-            <span className="flex-1 h-px bg-outline-variant/60" />
+          <div className="flex items-center gap-3 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">
+            <span className="flex-1 h-px bg-outline-variant/30 dark:bg-white/10" />
             O
-            <span className="flex-1 h-px bg-outline-variant/60" />
+            <span className="flex-1 h-px bg-outline-variant/30 dark:bg-white/10" />
           </div>
+          
           <GoogleSignInButton onCredential={handleGoogleCredential} onError={setServerError} />
         </div>
       </main>

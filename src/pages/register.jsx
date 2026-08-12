@@ -8,15 +8,10 @@ import Captcha from '../components/Captcha.jsx';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
 import Toast from '../components/Toast.jsx';
 
-
 const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ\s]{3,60}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^\d{10}$/;
 
-// Registro público: la cuenta que se crea aquí SIEMPRE es de tipo "usuario".
-// Autoasignarse el rol de administrador desde un formulario abierto al público
-// es una mala práctica de seguridad — las cuentas administrativas se dan de
-// alta por otro medio, controlado por el equipo de TraveXperience.
 const PASSWORD_RULE = {
   regex: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/,
   message: 'Debe tener al menos 8 caracteres, con una mayúscula, un número y un símbolo.',
@@ -77,8 +72,6 @@ function Register({ onNavigate, onRegisterSuccess }) {
   const [errors, setErrors] = useState({ fullName: '', email: '', password: '', confirmPassword: '', phone: '', location: '' });
   const [touched, setTouched] = useState({ fullName: false, email: false, password: false, confirmPassword: false, phone: false, location: false });
 
-  // La confirmación de contraseña no se valida con la regla genérica: necesita
-  // compararse contra el valor actual de "password", así que vive aparte.
   const confirmPasswordError = (pwd, confirm) => {
     if (!confirm) return 'Confirma tu contraseña.';
     if (confirm !== pwd) return 'Las contraseñas no coinciden.';
@@ -90,7 +83,7 @@ function Register({ onNavigate, onRegisterSuccess }) {
     const value = e.target.value;
     const nextValues = { ...values, [field]: value };
     setValues(nextValues);
-    // Si el campo ya fue tocado, validamos en vivo para dar feedback inmediato
+    
     if (touched[field]) {
       if (field === 'confirmPassword') {
         setErrors((prev) => ({ ...prev, confirmPassword: confirmPasswordError(nextValues.password, value) }));
@@ -98,7 +91,6 @@ function Register({ onNavigate, onRegisterSuccess }) {
         setErrors((prev) => ({ ...prev, [field]: validateField(field, value) }));
       }
     }
-    // Si cambia la contraseña después de haber confirmado, revalida la confirmación.
     if (field === 'password' && touched.confirmPassword) {
       setErrors((prev) => ({ ...prev, confirmPassword: confirmPasswordError(value, nextValues.confirmPassword) }));
     }
@@ -128,9 +120,7 @@ function Register({ onNavigate, onRegisterSuccess }) {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!validateAll()) {
-      return; // hay errores, no se envía el formulario
-    }
+    if (!validateAll()) return;
 
     if (!captchaOk) {
       setServerError('Resuelve la verificación de seguridad antes de continuar.');
@@ -187,36 +177,41 @@ function Register({ onNavigate, onRegisterSuccess }) {
   const inputClasses = (field, isValid = false) =>
     `w-full bg-transparent border-b py-3 px-1 text-base focus:outline-none transition-colors placeholder:text-outline/40 ${
       errors[field] && touched[field]
-        ? 'border-error focus:border-error'
+        ? 'border-error focus:border-error text-error'
         : isValid
-        ? 'border-green-600 focus:border-green-600'
-        : 'border-outline-variant focus:border-primary'
+        ? 'border-green-500 focus:border-green-500 text-green-600 dark:text-green-400'
+        : 'border-outline-variant/50 focus:border-yellow-500'
     }`;
 
   return (
-    <div className="bg-surface text-on-surface font-sans selection:bg-secondary-container min-h-screen flex flex-col justify-between">
+    <div className="auth-page-shell relative text-on-surface font-sans selection:bg-yellow-500/30 min-h-screen flex flex-col justify-between overflow-hidden">
+      <div className="auth-ambient auth-ambient-one" />
+      <div className="auth-ambient auth-ambient-two" />
+      <div className="auth-plane auth-plane-left">
+        <span className="material-symbols-outlined">flight</span>
+      </div>
+      <div className="auth-plane auth-plane-right">
+        <span className="material-symbols-outlined">flight_takeoff</span>
+      </div>
 
-      {/* Main Content Canvas */}
-      <main className="flex-grow flex items-center justify-center pt-24 pb-12 px-6">
-        <div className="w-full max-w-[480px] space-y-8 animate-fade-in-up">
+      <main className="flex-grow flex items-center justify-center pt-24 pb-12 px-6 relative z-10">
+        <div className="auth-page-card w-full max-w-[520px] backdrop-blur-2xl rounded-[30px] border p-8 sm:p-10 shadow-2xl space-y-8 animate-fade-in-up">
 
-          {/* Welcome Title */}
           <div className="text-center space-y-2 animate-fade-in-up" style={{ animationDelay: '40ms' }}>
-            <h1 className="text-5xl font-bold text-on-surface">Crea tu cuenta</h1>
-            <p className="text-base text-on-surface-variant">Únete a la nueva era del turismo inteligente.</p>
+            <h1 className="text-4xl sm:text-5xl font-black text-on-surface tracking-tight">Crea tu cuenta</h1>
+            <p className="text-base text-on-surface-variant font-medium">Únete a la nueva era del turismo inteligente.</p>
           </div>
 
-          {/* Registration Form */}
           <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-
-            {/* Input Fields */}
-            <div className="space-y-4">
+            
+            <div className="space-y-5">
+              {/* Full Name */}
               <div className="space-y-1 group animate-fade-in-up" style={{ animationDelay: '80ms' }}>
-                <label className="text-xs font-semibold text-on-surface-variant uppercase group-focus-within:text-primary dark:group-focus-within:text-white transition-colors block" htmlFor="full_name">
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest group-focus-within:text-yellow-500 transition-colors block" htmlFor="full_name">
                   Nombre Completo
                 </label>
                 <input
-                  className={inputClasses('fullName')}
+                  className={`${inputClasses('fullName')} auth-input`}
                   id="full_name"
                   placeholder="Ej: Julian Casablancas"
                   type="text"
@@ -224,20 +219,23 @@ function Register({ onNavigate, onRegisterSuccess }) {
                   onChange={handleChange('fullName')}
                   onBlur={handleBlur('fullName')}
                   aria-invalid={!!(errors.fullName && touched.fullName)}
-                  aria-describedby="full_name_error"
                   required
                 />
                 {errors.fullName && touched.fullName && (
-                  <p id="full_name_error" className="text-xs text-error pt-1 animate-fade-in">{errors.fullName}</p>
+                  <p className="text-xs text-error font-medium flex items-center gap-1 pt-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span>
+                    {errors.fullName}
+                  </p>
                 )}
               </div>
 
+              {/* Email */}
               <div className="space-y-1 group animate-fade-in-up" style={{ animationDelay: '120ms' }}>
-                <label className="text-xs font-semibold text-on-surface-variant uppercase group-focus-within:text-primary dark:group-focus-within:text-white transition-colors block" htmlFor="email">
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest group-focus-within:text-yellow-500 transition-colors block" htmlFor="email">
                   Correo Electrónico
                 </label>
                 <input
-                  className={inputClasses('email')}
+                  className={`${inputClasses('email')} auth-input`}
                   id="email"
                   placeholder="nombre@ejemplo.com"
                   type="email"
@@ -245,16 +243,19 @@ function Register({ onNavigate, onRegisterSuccess }) {
                   onChange={handleChange('email')}
                   onBlur={handleBlur('email')}
                   aria-invalid={!!(errors.email && touched.email)}
-                  aria-describedby="email_error"
                   required
                 />
                 {errors.email && touched.email && (
-                  <p id="email_error" className="text-xs text-error pt-1 animate-fade-in">{errors.email}</p>
+                  <p className="text-xs text-error font-medium flex items-center gap-1 pt-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span>
+                    {errors.email}
+                  </p>
                 )}
               </div>
 
+              {/* Password */}
               <div className="space-y-1 group animate-fade-in-up" style={{ animationDelay: '160ms' }}>
-                <label className="text-xs font-semibold text-on-surface-variant uppercase group-focus-within:text-primary dark:group-focus-within:text-white transition-colors block" htmlFor="password">
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest group-focus-within:text-yellow-500 transition-colors block" htmlFor="password">
                   Contraseña
                 </label>
                 <div className="relative">
@@ -267,13 +268,13 @@ function Register({ onNavigate, onRegisterSuccess }) {
                     onChange={handleChange('password')}
                     onBlur={handleBlur('password')}
                     aria-invalid={!!(errors.password && touched.password)}
-                    aria-describedby="password_error"
                     required
                   />
                   <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant/60 hover:text-primary transition-colors"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant/60 hover:text-yellow-500 dark:hover:drop-shadow-[0_0_8px_rgba(234,179,8,0.8)] transition-all duration-300 bg-transparent border-none cursor-pointer active:scale-90"
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
                   >
                     <span className="material-symbols-outlined text-[20px]">
                       {showPassword ? 'visibility_off' : 'visibility'}
@@ -281,19 +282,25 @@ function Register({ onNavigate, onRegisterSuccess }) {
                   </button>
                 </div>
                 {errors.password && touched.password ? (
-                  <p id="password_error" className="text-xs text-error pt-1 animate-fade-in">{errors.password}</p>
+                  <p className="text-xs text-error font-medium flex items-center gap-1 pt-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span>
+                    {errors.password}
+                  </p>
                 ) : (
-                  <p className="text-[11px] text-on-surface-variant/70 pt-1">Al menos 8 caracteres, con mayúscula, número y símbolo.</p>
+                  <p className="text-[11px] text-on-surface-variant/70 pt-1 font-medium">
+                    Al menos 8 caracteres, con mayúscula, número y símbolo.
+                  </p>
                 )}
               </div>
 
+              {/* Confirm Password */}
               <div className="space-y-1 group animate-fade-in-up" style={{ animationDelay: '180ms' }}>
-                <label className="text-xs font-semibold text-on-surface-variant uppercase group-focus-within:text-primary dark:group-focus-within:text-white transition-colors block" htmlFor="confirm_password">
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest group-focus-within:text-yellow-500 transition-colors block" htmlFor="confirm_password">
                   Confirmar Contraseña
                 </label>
                 <div className="relative">
                   <input
-                    className={inputClasses('confirmPassword', passwordsMatch)}
+                    className={`${inputClasses('confirmPassword', passwordsMatch)} auth-input`}
                     id="confirm_password"
                     placeholder="Repite tu contraseña"
                     type={showPassword ? 'text' : 'password'}
@@ -301,29 +308,30 @@ function Register({ onNavigate, onRegisterSuccess }) {
                     onChange={handleChange('confirmPassword')}
                     onBlur={handleBlur('confirmPassword')}
                     aria-invalid={!!(errors.confirmPassword && touched.confirmPassword)}
-                    aria-describedby="confirm_password_error"
                     required
                   />
                   {passwordsMatch && (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 material-symbols-outlined text-green-600 text-[20px]">
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 material-symbols-outlined text-green-500 text-[20px]">
                       check_circle
                     </span>
                   )}
                 </div>
                 {errors.confirmPassword && touched.confirmPassword && (
-                  <p id="confirm_password_error" className="text-xs text-error pt-1 animate-fade-in">{errors.confirmPassword}</p>
+                  <p className="text-xs text-error font-medium flex items-center gap-1 pt-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span>
+                    {errors.confirmPassword}
+                  </p>
                 )}
               </div>
 
-              {/* Teléfono y ubicación: completan el perfil del usuario desde el registro
-                  (antes solo se pedían nombre, correo y contraseña). */}
+              {/* Phone & Location Grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1 group animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-                  <label className="text-xs font-semibold text-on-surface-variant uppercase group-focus-within:text-primary dark:group-focus-within:text-white transition-colors block" htmlFor="phone">
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest group-focus-within:text-yellow-500 transition-colors block" htmlFor="phone">
                     Teléfono
                   </label>
                   <input
-                    className={inputClasses('phone')}
+                    className={`${inputClasses('phone')} auth-input`}
                     id="phone"
                     placeholder="10 dígitos"
                     type="tel"
@@ -333,20 +341,22 @@ function Register({ onNavigate, onRegisterSuccess }) {
                     onChange={handleChange('phone')}
                     onBlur={handleBlur('phone')}
                     aria-invalid={!!(errors.phone && touched.phone)}
-                    aria-describedby="phone_error"
                     required
                   />
                   {errors.phone && touched.phone && (
-                    <p id="phone_error" className="text-xs text-error pt-1 animate-fade-in">{errors.phone}</p>
+                    <p className="text-xs text-error font-medium flex items-center gap-1 pt-1">
+                      <span className="material-symbols-outlined text-[14px]">error</span>
+                      {errors.phone}
+                    </p>
                   )}
                 </div>
 
                 <div className="space-y-1 group animate-fade-in-up" style={{ animationDelay: '220ms' }}>
-                  <label className="text-xs font-semibold text-on-surface-variant uppercase group-focus-within:text-primary dark:group-focus-within:text-white transition-colors block" htmlFor="location">
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest group-focus-within:text-yellow-500 transition-colors block" htmlFor="location">
                     Ciudad / Origen
                   </label>
                   <input
-                    className={inputClasses('location')}
+                    className={`${inputClasses('location')} auth-input`}
                     id="location"
                     placeholder="Ej: Puebla, Pue."
                     type="text"
@@ -354,29 +364,29 @@ function Register({ onNavigate, onRegisterSuccess }) {
                     onChange={handleChange('location')}
                     onBlur={handleBlur('location')}
                     aria-invalid={!!(errors.location && touched.location)}
-                    aria-describedby="location_error"
                     required
                   />
                   {errors.location && touched.location && (
-                    <p id="location_error" className="text-xs text-error pt-1 animate-fade-in">{errors.location}</p>
+                    <p className="text-xs text-error font-medium flex items-center gap-1 pt-1">
+                      <span className="material-symbols-outlined text-[14px]">error</span>
+                      {errors.location}
+                    </p>
                   )}
                 </div>
               </div>
-              <p className="text-[11px] text-on-surface-variant/70 -mt-2">
+              <p className="text-[11px] text-on-surface-variant/70 -mt-1 font-medium animate-fade-in-up" style={{ animationDelay: '240ms' }}>
                 Con esto personalizamos tus recomendaciones y tu perfil de viajero.
               </p>
             </div>
 
-            {/* Verificación anti-bot */}
             <Captcha onVerify={setCaptchaOk} resetSignal={captchaResetSignal} />
 
-            {/* CTA and Action Button */}
             <div className="pt-4 space-y-6 animate-fade-in-up" style={{ animationDelay: '260ms' }}>
               <button
-                className={`w-full py-4 rounded-full text-lg font-bold transition-all duration-300 active:scale-[0.98] shadow-sm flex items-center justify-center gap-2 cursor-pointer border-none ${
+                className={`w-full py-4 rounded-2xl text-lg font-bold transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed ${
                   status === 'success'
-                    ? 'bg-secondary-container text-primary'
-                    : 'bg-primary text-on-primary hover:bg-opacity-90'
+                    ? 'bg-secondary-container text-black'
+                    : 'bg-yellow-500 text-black hover:bg-yellow-400 hover:-translate-y-1 hover:shadow-[0_12px_40px_rgba(234,179,8,0.25)]'
                 }`}
                 type="submit"
                 disabled={status === 'loading'}
@@ -402,11 +412,11 @@ function Register({ onNavigate, onRegisterSuccess }) {
                     e.preventDefault();
                     if (onNavigate) onNavigate('login');
                   }}
-                  className="text-base text-on-surface-variant"
+                  className="text-sm font-medium text-on-surface-variant"
                   href="#login"
                 >
                   Ya tengo cuenta,{' '}
-                  <span className="text-primary font-bold hover:text-secondary transition-colors underline underline-offset-4 decoration-primary/40 cursor-pointer">
+                  <span className="text-yellow-500 font-bold hover:text-yellow-400 transition-colors underline underline-offset-4 decoration-yellow-500/40 cursor-pointer">
                     Iniciar sesión
                   </span>
                 </a>
@@ -414,12 +424,12 @@ function Register({ onNavigate, onRegisterSuccess }) {
             </div>
           </form>
 
-          {/* Divisor + Google */}
-          <div className="flex items-center gap-3 text-xs font-semibold text-on-surface-variant/60 uppercase tracking-wider">
-            <span className="flex-1 h-px bg-outline-variant/60" />
+          <div className="flex items-center gap-3 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">
+            <span className="flex-1 h-px bg-outline-variant/30 dark:bg-white/10" />
             O
-            <span className="flex-1 h-px bg-outline-variant/60" />
+            <span className="flex-1 h-px bg-outline-variant/30 dark:bg-white/10" />
           </div>
+          
           <GoogleSignInButton onCredential={handleGoogleCredential} onError={setServerError} />
         </div>
       </main>
