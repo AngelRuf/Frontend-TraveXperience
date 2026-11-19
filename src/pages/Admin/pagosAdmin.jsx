@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import useModalScrollLock from '../../hooks/useModalScrollLock.jsx';
 import AdminLayout from '../../components/adminLayout.jsx';
 import { AdminErrorBanner } from '../../components/adminAsyncState.jsx';
+import { useToast } from '../../context/ToastContext.jsx';
+import useScrollToTopOnOpen from '../../hooks/useScrollToTopOnOpen.js';
 import {
   getFinances,
   getTransactions,
@@ -125,8 +126,6 @@ function validateCardField(field, value) {
 
 // ---------- Modal Genérico Mejorado ----------
 function Modal({ title, icon, onClose, children }) {
-  useModalScrollLock(true);
-
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto">
       <div className="bg-surface border border-solid border-outline-variant/30 rounded-3xl w-full max-w-md p-6 md:p-8 relative shadow-2xl animate-scale-in mt-12 md:mt-20 max-h-[calc(100vh-8rem)] overflow-y-auto">
@@ -159,7 +158,11 @@ function fmtCurrency(n) {
 const PAGE_SIZE = 10;
 
 function AdminPagos({ onNavigate }) {
-  const [activeModal, setActiveModal] = useState(null); 
+  const [activeModal, setActiveModal] = useState(null);
+  const { showToast } = useToast();
+
+  // Sube la página al tope al abrir cualquiera de los modales de Pagos.
+  useScrollToTopOnOpen(!!activeModal);
 
   // --- Finanzas ---
   const [finances, setFinances] = useState(null);
@@ -301,6 +304,7 @@ function AdminPagos({ onNavigate }) {
     try {
       await transferFunds(payload);
       setTransferStatus('success');
+      showToast('Transferencia realizada correctamente.');
       loadFinances();
       setTimeout(() => {
         setActiveModal(null);
@@ -311,7 +315,9 @@ function AdminPagos({ onNavigate }) {
       }, 1200);
     } catch (err) {
       setTransferStatus('error');
-      setTransferServerError(classifyAdminError(err).message);
+      const msg = classifyAdminError(err).message;
+      setTransferServerError(msg);
+      showToast(msg, 'error');
     }
   };
 
@@ -380,6 +386,7 @@ function AdminPagos({ onNavigate }) {
     try {
       await addPaymentMethod(payload);
       setCardStatus('success');
+      showToast('Tarjeta agregada correctamente.');
       await loadCards();
       setTimeout(() => {
         setActiveModal(null);
@@ -388,7 +395,9 @@ function AdminPagos({ onNavigate }) {
       }, 1000);
     } catch (err) {
       setCardStatus('error');
-      setCardServerError(classifyAdminError(err).message);
+      const msg = classifyAdminError(err).message;
+      setCardServerError(msg);
+      showToast(msg, 'error');
     }
   };
 
@@ -407,9 +416,12 @@ function AdminPagos({ onNavigate }) {
       setCardStatus('idle');
       setCardPendingDeleteId(null);
       setActiveModal(null);
+      showToast('Tarjeta eliminada correctamente.');
     } catch (err) {
       setCardStatus('error');
-      setCardServerError(classifyAdminError(err).message);
+      const msg = classifyAdminError(err).message;
+      setCardServerError(msg);
+      showToast(msg, 'error');
     }
   };
 
@@ -417,8 +429,9 @@ function AdminPagos({ onNavigate }) {
     try {
       await setDefaultPaymentMethod(id);
       await loadCards();
+      showToast('Tarjeta predeterminada actualizada.');
     } catch {
-      // Silencioso
+      showToast('No pudimos actualizar la tarjeta predeterminada.', 'error');
     }
   };
 

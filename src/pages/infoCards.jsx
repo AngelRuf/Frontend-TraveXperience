@@ -1,6 +1,6 @@
+import { osmEmbedUrl, directionsUrl } from '../services/osmService';
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import useModalScrollLock from '../hooks/useModalScrollLock.jsx';
 import WeatherWidget from '../components/WeatherWidget.jsx';
 import AddToItineraryModal from '../components/AddToItineraryModal.jsx';
 import Toast from '../components/Toast.jsx';
@@ -9,6 +9,7 @@ import * as favoriteService from '../services/favoriteService';
 import * as reviewService from '../services/reviewService';
 import { sendPresenceHeartbeat, getPresenceCount, sendPresenceLeave } from '../services/placesService';
 import { resolveMediaUrl } from '../services/apiClient';
+import SafeImage from '../components/SafeImage.jsx';
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1518998053901-5348d3961a04?auto=format&fit=crop&w=1600&q=80';
@@ -48,8 +49,6 @@ const FILLED_ICON_STYLE = { fontVariationSettings: "'FILL' 1, 'wght' 500, 'GRAD'
  *  contenedor ancestro con `transform` (p.ej. animaciones de transición de
  *  página) rompa el `position: fixed` y empuje el modal fuera de lugar. */
 function ImageLightbox({ images, index, onClose, onNavigate }) {
-  useModalScrollLock(true);
-
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === 'Escape') onClose();
@@ -57,8 +56,12 @@ function ImageLightbox({ images, index, onClose, onNavigate }) {
       if (e.key === 'ArrowLeft') onNavigate((index - 1 + images.length) % images.length);
     }
     document.addEventListener('keydown', handleKeyDown);
+    // Evita que la página de fondo haga scroll mientras el lightbox está abierto.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
     };
   }, [index, images.length, onClose, onNavigate]);
 
@@ -86,11 +89,11 @@ function ImageLightbox({ images, index, onClose, onNavigate }) {
         </button>
       )}
 
-      <img
+      <SafeImage
         src={images[index]}
         alt={`Imagen ampliada ${index + 1} de ${images.length}`}
         className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       />
 
       {images.length > 1 && (
@@ -125,7 +128,13 @@ function HotelDetail({ onNavigate, hotel: place }) {
   const description =
     place?.description ||
     'Aún no hay una descripción detallada para este lugar. Vuelve pronto — el equipo local está completando esta ficha.';
-  const address = place?.address || 'Xicotepec de Juárez, Puebla';
+  const address =
+    place?.address ||
+    place?.formattedAddress ||
+    place?.raw?.formattedAddress ||
+    place?.municipality ||
+    place?.raw?.municipality ||
+    'Xicotepec de Juárez, Puebla';
   const category = place?.categoryLabel || place?.category || (isHotel ? 'Hotel' : 'Experiencia local');
   const rating = place?.rating;
   const reviewsCount = place?.reviewsCount;
@@ -144,8 +153,6 @@ function HotelDetail({ onNavigate, hotel: place }) {
   const [showToast, setShowToast] = useState(false);
   const [showItineraryModal, setShowItineraryModal] = useState(false);
   const [itineraryToast, setItineraryToast] = useState(null);
-
-  useModalScrollLock(showItineraryModal);
 
   // Lightbox de la galería de fotos
   const [lightboxIndex, setLightboxIndex] = useState(null); // null = cerrado
@@ -417,7 +424,7 @@ function HotelDetail({ onNavigate, hotel: place }) {
             className="relative group cursor-pointer overflow-hidden p-0 border-none bg-transparent w-full h-[280px] md:h-[420px] rounded-3xl shadow-md block"
           >
             <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors z-10 pointer-events-none"></div>
-            <img
+            <SafeImage
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               alt={`Vista principal de ${title}`}
               src={gallery[0]}
@@ -440,7 +447,7 @@ function HotelDetail({ onNavigate, hotel: place }) {
                   className="relative shrink-0 w-24 h-20 md:w-28 md:h-24 rounded-xl overflow-hidden p-0 border-none cursor-pointer group"
                 >
                   <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors z-10 pointer-events-none"></div>
-                  <img
+                  <SafeImage
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     alt={`Foto adicional ${idx + 2} de ${title}`}
                     src={src}
@@ -568,11 +575,11 @@ function HotelDetail({ onNavigate, hotel: place }) {
                         className="w-full h-full border-0"
                         loading="lazy"
                         referrerPolicy="no-referrer-when-downgrade"
-                        src={`https://www.google.com/maps?q=${placeLat},${placeLng}&z=15&output=embed`}
+                        src={osmEmbedUrl(Number(placeLat), Number(placeLng))}
                       />
                     </div>
                     <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${placeLat},${placeLng}`}
+                      href={directionsUrl(placeLat, placeLng)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 mt-3 text-xs font-bold text-primary hover:underline"

@@ -3,6 +3,7 @@ import Header from '../components/header';
 import Footer from '../components/footer';
 import { useAuth } from '../context/AuthContext.jsx';
 import * as favoriteService from '../services/favoriteService';
+import SafeImage from '../components/SafeImage.jsx';
 
 function SavedTrips({ onNavigate, isSettingsTab = false }) {
   const { isLoggedIn } = useAuth();
@@ -127,7 +128,7 @@ function SavedTrips({ onNavigate, isSettingsTab = false }) {
           >
             {/* Contenedor de Imagen */}
             <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-container-high shrink-0 z-0">
-              <img
+              <SafeImage
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ease-out"
                 alt={item.title}
                 src={item.image}

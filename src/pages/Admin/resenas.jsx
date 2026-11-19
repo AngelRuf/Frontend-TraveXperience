@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../components/adminLayout.jsx';
 import * as reviewService from '../../services/reviewService';
 import { ApiError } from '../../services/apiClient';
+import { useToast } from '../../context/ToastContext.jsx';
+import useScrollToTopOnOpen from '../../hooks/useScrollToTopOnOpen.js';
 
 const PAGE_SIZE = 15;
 
@@ -31,14 +33,9 @@ function AdminResenas({ onNavigate }) {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [toast, setToast] = useState(null);
+  const { showToast } = useToast();
 
-  useModalScrollLock(Boolean(deleteTarget));
-
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast((c) => (c === msg ? null : c)), 3000);
-  };
+  useScrollToTopOnOpen(!!deleteTarget);
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -76,7 +73,7 @@ function AdminResenas({ onNavigate }) {
       setDeleteTarget(null);
       load();
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : 'No pudimos eliminar la reseña.');
+      showToast(err instanceof ApiError ? err.message : 'No pudimos eliminar la reseña.', 'error');
     } finally {
       setDeleting(false);
     }
@@ -313,13 +310,6 @@ function AdminResenas({ onNavigate }) {
         </div>
       )}
 
-      {/* --- Notificaciones Toast --- */}
-      <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 bg-surface-container-highest text-on-surface px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 z-[100] transition-all duration-500 ease-out border border-solid border-outline-variant/50 ${
-        toast ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0 pointer-events-none'
-      }`}>
-        <span className="material-symbols-outlined text-green-500 text-2xl">check_circle</span>
-        <span className="text-sm font-bold">{toast}</span>
-      </div>
     </AdminLayout>
   );
 }

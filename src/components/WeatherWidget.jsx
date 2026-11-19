@@ -85,6 +85,11 @@ function WeatherWidget({ lat, lng, size = 'md', className = '' }) {
           {weather.description}
         </span>
       )}
+      {weather.rainProbability != null && (
+        <span className={`text-on-surface-variant whitespace-nowrap ${isSmall ? 'text-[10px]' : 'text-xs'}`}>
+          {weather.rainProbability}% lluvia
+        </span>
+      )}
     </div>
   );
 }

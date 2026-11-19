@@ -24,6 +24,7 @@
  */
 
 import { api, resolveMediaUrl } from './apiClient';
+import { formatDistance, haversineDistance } from '../utils/geo.js';
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1518998053901-5348d3961a04?auto=format&fit=crop&w=600&q=80';
@@ -37,6 +38,9 @@ export const DEFAULT_COORDS = { lat: 20.2822, lng: -97.9497 };
  *  - objeto: { url }, { secure_url } (formato Cloudinary), { path }, { src }
  * Esta función normaliza cualquiera de esas formas a una URL usable en <img src>.
  */
+// justo arriba de resolveImageEntry:
+const isGooglePhoto = (u) => /maps\.googleapis\.com|\/maps\/photo/i.test(u);
+
 function resolveImageEntry(entry) {
   if (!entry) return null;
   let url = null;
@@ -44,7 +48,7 @@ function resolveImageEntry(entry) {
   else if (typeof entry === 'object') {
     url = entry.url || entry.secure_url || entry.path || entry.src || entry.href || null;
   }
-  return url ? resolveMediaUrl(url) : null;
+    return url && !isGooglePhoto(url) ? resolveMediaUrl(url) : null;
 }
 
 function firstImage(raw) {
@@ -87,19 +91,22 @@ function allImages(raw) {
 function extractCoords(raw) {
   const geo = raw.location?.coordinates || raw.coordinates;
   if (Array.isArray(geo) && geo.length === 2) {
-    return { lat: geo[1], lng: geo[0] };
+    const lat = geo[1] == null ? null : Number(geo[1]);
+    const lng = geo[0] == null ? null : Number(geo[0]);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
   }
-  if (raw.lat !== undefined && raw.lng !== undefined) return { lat: raw.lat, lng: raw.lng };
-  if (raw.latitude !== undefined && raw.longitude !== undefined) {
-    return { lat: raw.latitude, lng: raw.longitude };
+  const flatLat = raw.lat ?? raw.latitude;
+  const flatLng = raw.lng ?? raw.longitude;
+  if (flatLat != null && flatLng != null) {
+    const lat = Number(flatLat);
+    const lng = Number(flatLng);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
   }
   return { lat: null, lng: null };
-}
-
-function formatDistance(meters) {
-  const value = Number(meters);
-  if (meters === undefined || meters === null || Number.isNaN(value)) return '';
-  return value < 1000 ? `${Math.round(value)} m` : `${(value / 1000).toFixed(1)} km`;
 }
 
 export function humanizeCategoryLabel(value) {
@@ -118,11 +125,18 @@ export function humanizeCategoryLabel(value) {
 }
 
 /** Traduce un `Place` o `Hotel` crudo del backend a la forma que usa la UI. */
-export function normalizePlace(raw, kind = 'place') {
+export function normalizePlace(raw, kind = 'place', origin = null) {
   if (!raw) return null;
   const { lat, lng } = extractCoords(raw);
-  const distanceMeters = raw.distance ?? raw.distanceInMeters ?? raw.dist?.calculated;
-  const resolvedImage = firstImage(raw) || FALLBACK_IMAGE;
+  const backendDistance = raw.distance ?? raw.distanceInMeters ?? raw.dist?.calculated;
+  const parsedDistance = backendDistance == null || backendDistance === '' ? null : Number(backendDistance);
+  const distanceMeters = Number.isFinite(parsedDistance)
+    ? parsedDistance
+    : origin && lat != null && lng != null
+      ? haversineDistance(origin.lat, origin.lng, lat, lng)
+      : null;
+  const realImage = firstImage(raw);
+  const resolvedImage = realImage || FALLBACK_IMAGE;
   return {
     id: raw._id || raw.id,
     kind,
@@ -137,8 +151,9 @@ export function normalizePlace(raw, kind = 'place') {
     images: allImages(raw).length ? allImages(raw) : [resolvedImage],
     rating: raw.rating ?? raw.averageRating ?? null,
     reviewsCount: raw.reviewsCount ?? raw.totalReviews ?? (Array.isArray(raw.reviews) ? raw.reviews.length : null),
-    address: raw.address || raw.direccion || '',
+    address: raw.address || raw.formattedAddress || raw.direccion || raw.municipality || '',
     price: raw.pricePerNight ?? raw.price ?? null,
+    hasRealImage: !!realImage,
     distanceLabel: formatDistance(distanceMeters),
     lat,
     lng,
@@ -171,7 +186,7 @@ export const getNearbyPlaces = async ({ lat, lng, radius, category, limit } = {}
 
   const raw = await api.get(`/local/nearby?${params.toString()}`, { auth: false });
   const list = Array.isArray(raw) ? raw : raw?.places || raw?.results || raw?.data || [];
-  return list.map((p) => normalizePlace(p, 'place')).filter(Boolean);
+  return list.map((p) => normalizePlace(p, 'place', { lat, lng })).filter(Boolean);
 };
 
 export const getNearbyHotels = async ({ lat, lng, radius, limit } = {}) => {
@@ -185,7 +200,7 @@ export const getNearbyHotels = async ({ lat, lng, radius, limit } = {}) => {
 
   const raw = await api.get(`/hotels/nearby?${params.toString()}`, { auth: false });
   const list = Array.isArray(raw) ? raw : raw?.hotels || raw?.results || raw?.data || [];
-  return list.map((h) => normalizePlace(h, 'hotel')).filter(Boolean);
+  return list.map((h) => normalizePlace(h, 'hotel', { lat, lng })).filter(Boolean);
 };
 
 /** Devuelve las categorías reales del catálogo. Si el endpoint falla, devuelve [] y quien llama decide el fallback. */

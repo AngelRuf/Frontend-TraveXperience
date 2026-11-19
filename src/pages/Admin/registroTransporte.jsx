@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { useLoadScript, Autocomplete } from '@react-google-maps/api';
+import AddressAutocomplete from '../../components/AddressAutocomplete.jsx';
 import AdminLayout from '../../components/adminLayout.jsx';
 import * as transportService from '../../services/transportService';
 import { ApiError } from '../../services/apiClient';
-
-const GOOGLE_MAPS_LIBRARIES = ['places'];
+import { useToast } from '../../context/ToastContext.jsx';
 
 const DAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
@@ -61,6 +60,7 @@ function validateTransportField(field, value, allValues) {
 }
 
 function AdminTransporte({ onNavigate }) {
+  const { showToast } = useToast();
   const [selectedDays, setSelectedDays] = useState({ L: true, M: true, X: true, J: true, V: true, S: false, D: false });
 
   const [values, setValues] = useState({
@@ -98,22 +98,11 @@ function AdminTransporte({ onNavigate }) {
     setPriceTiers((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const { isLoaded: isMapsLoaded, loadError: mapsLoadError } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
-  const [origenAutocomplete, setOrigenAutocomplete] = useState(null);
-  const [destinoAutocomplete, setDestinoAutocomplete] = useState(null);
   const [origenCoords, setOrigenCoords] = useState({ lat: null, lng: null });
   const [destinoCoords, setDestinoCoords] = useState({ lat: null, lng: null });
 
-  const handleOrigenPlaceChanged = () => {
-    if (!origenAutocomplete) return;
-    const place = origenAutocomplete.getPlace();
-    if (!place || !place.geometry || !place.geometry.location) return;
-    const lat = place.geometry.location.lat();
-    const lng = place.geometry.location.lng();
-    const address = place.formatted_address || place.name || '';
+  const handleOrigenPlaceChanged = ({ lat, lng, address: addr, name }) => {
+    const address = addr || name || '';
     setOrigenCoords({ lat, lng });
     setValues((prev) => ({ ...prev, origen: address }));
     if (touched.destino) {
@@ -121,13 +110,8 @@ function AdminTransporte({ onNavigate }) {
     }
   };
 
-  const handleDestinoPlaceChanged = () => {
-    if (!destinoAutocomplete) return;
-    const place = destinoAutocomplete.getPlace();
-    if (!place || !place.geometry || !place.geometry.location) return;
-    const lat = place.geometry.location.lat();
-    const lng = place.geometry.location.lng();
-    const address = place.formatted_address || place.name || '';
+  const handleDestinoPlaceChanged = ({ lat, lng, address: addr, name }) => {
+    const address = addr || name || '';
     setDestinoCoords({ lat, lng });
     setValues((prev) => ({ ...prev, destino: address }));
     if (touched.origen) {
@@ -211,10 +195,13 @@ function AdminTransporte({ onNavigate }) {
     try {
       await transportService.createTransport(payload);
       setSubmitStatus('success');
+      showToast('Transporte registrado correctamente.');
       setTimeout(() => setSubmitStatus('idle'), 3000);
     } catch (err) {
       setSubmitStatus('idle');
-      setSubmitError(err instanceof ApiError ? err.message : 'No pudimos registrar el transporte. Intenta de nuevo.');
+      const msg = err instanceof ApiError ? err.message : 'No pudimos registrar el transporte. Intenta de nuevo.';
+      setSubmitError(msg);
+      showToast(msg, 'error');
     }
   };
 
@@ -289,31 +276,14 @@ function AdminTransporte({ onNavigate }) {
                 <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Origen</label>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] z-10">trip_origin</span>
-                  {isMapsLoaded && !mapsLoadError ? (
-                    <Autocomplete
-                      onLoad={setOrigenAutocomplete}
-                      onPlaceChanged={handleOrigenPlaceChanged}
-                      options={{ fields: ['formatted_address', 'name', 'geometry'] }}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Ciudad o Aeropuerto"
-                        className={`${inputClasses('origen')} pl-10`}
-                        value={values.origen}
-                        onChange={handleChange('origen')}
-                        onBlur={handleBlur('origen')}
-                      />
-                    </Autocomplete>
-                  ) : (
-                    <input
-                      type="text"
-                      placeholder="Ciudad o Aeropuerto"
-                      className={`${inputClasses('origen')} pl-10`}
-                      value={values.origen}
-                      onChange={handleChange('origen')}
-                      onBlur={handleBlur('origen')}
-                    />
-                  )}
+                  <AddressAutocomplete
+                    onSelect={handleOrigenPlaceChanged}
+                    placeholder="Ciudad o Aeropuerto"
+                    className={`${inputClasses('origen')} pl-10`}
+                    value={values.origen}
+                    onChange={handleChange('origen')}
+                    onBlur={handleBlur('origen')}
+                  />
                 </div>
                 {origenCoords.lat !== null && (
                   <p className="text-xs text-green-500 font-medium flex items-center gap-1 mt-1">
@@ -327,31 +297,14 @@ function AdminTransporte({ onNavigate }) {
                 <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Destino</label>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] z-10">location_on</span>
-                  {isMapsLoaded && !mapsLoadError ? (
-                    <Autocomplete
-                      onLoad={setDestinoAutocomplete}
-                      onPlaceChanged={handleDestinoPlaceChanged}
-                      options={{ fields: ['formatted_address', 'name', 'geometry'] }}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Ciudad o Aeropuerto"
-                        className={`${inputClasses('destino')} pl-10`}
-                        value={values.destino}
-                        onChange={handleChange('destino')}
-                        onBlur={handleBlur('destino')}
-                      />
-                    </Autocomplete>
-                  ) : (
-                    <input
-                      type="text"
-                      placeholder="Ciudad o Aeropuerto"
-                      className={`${inputClasses('destino')} pl-10`}
-                      value={values.destino}
-                      onChange={handleChange('destino')}
-                      onBlur={handleBlur('destino')}
-                    />
-                  )}
+                  <AddressAutocomplete
+                    onSelect={handleDestinoPlaceChanged}
+                    placeholder="Ciudad o Aeropuerto"
+                    className={`${inputClasses('destino')} pl-10`}
+                    value={values.destino}
+                    onChange={handleChange('destino')}
+                    onBlur={handleBlur('destino')}
+                  />
                 </div>
                 {destinoCoords.lat !== null && (
                   <p className="text-xs text-green-500 font-medium flex items-center gap-1 mt-1">
@@ -360,11 +313,6 @@ function AdminTransporte({ onNavigate }) {
                   </p>
                 )}
                 {errors.destino && touched.destino && <p className="text-xs text-error">{errors.destino}</p>}
-                {mapsLoadError && (
-                  <p className="text-xs text-on-surface-variant">
-                    No se pudo cargar Google Maps. Ingresa manualmente.
-                  </p>
-                )}
               </div>
             </div>
           </div>

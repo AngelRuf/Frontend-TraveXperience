@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import useModalScrollLock from '../../hooks/useModalScrollLock.jsx';
-import { useLoadScript, Autocomplete } from '@react-google-maps/api';
+import AddressAutocomplete from '../../components/AddressAutocomplete.jsx';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -8,6 +7,9 @@ import AdminLayout from '../../components/adminLayout.jsx';
 import { DEFAULT_COORDS } from '../../services/placesService';
 import * as hotelService from '../../services/hotelService';
 import { ApiError } from '../../services/apiClient';
+import { resolveMediaUrl, bumpMediaCacheVersion } from '../../services/apiClient';
+import { useToast } from '../../context/ToastContext.jsx';
+import useScrollToTopOnOpen from '../../hooks/useScrollToTopOnOpen.js';
 
 const previewPinIcon = L.divIcon({
   html: `<span class="material-symbols-outlined" style="font-size:36px;color:#facc15;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))">location_on</span>`,
@@ -15,8 +17,6 @@ const previewPinIcon = L.divIcon({
   iconSize: [36, 36],
   iconAnchor: [18, 36],
 });
-
-const GOOGLE_MAPS_LIBRARIES = ['places'];
 
 const AMENITIES = [
   { key: 'pool', label: 'Piscina', icon: 'pool' },
@@ -51,23 +51,28 @@ function validateHotelField(field, value) {
 }
 
 function AdminHoteles({ onNavigate }) {
+  const { showToast } = useToast();
   const [selectedAmenities, setSelectedAmenities] = useState({});
   // Adaptado a: { name, details, pricePerNight }
   const [rooms, setRooms] = useState([
     { id: 1, name: 'Habitación Estándar', details: 'Cama Queen, 25m²', pricePerNight: 1800 },
     { id: 2, name: 'Suite Ejecutiva', details: 'Cama King, 55m²', pricePerNight: 3200 },
   ]);
+
+  // --- Imagen principal ---
+  // mainImage: el File real seleccionado (o null si no se cambió nada nuevo).
+  // mainImagePreview: URL para <img src>, ya sea un blob local recién elegido
+  // o la URL ya guardada del hotel que se está editando (vía resolveMediaUrl).
   const [mainImage, setMainImage] = useState(null);
+  const [mainImagePreview, setMainImagePreview] = useState(null);
 
   const [hotels, setHotels] = useState([]);
-  const [hotelsStatus, setHotelsStatus] = useState('loading'); 
-  const [editingId, setEditingId] = useState(null); 
+  const [hotelsStatus, setHotelsStatus] = useState('loading');
+  const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletingHotel, setDeletingHotel] = useState(false);
 
   const [isAddRoomModalOpen, setIsAddRoomModalOpen] = useState(false);
-
-  useModalScrollLock(Boolean(deleteTarget) || isAddRoomModalOpen);
   const [newRoomName, setNewRoomName] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,14 +94,24 @@ function AdminHoteles({ onNavigate }) {
 
   useEffect(() => { loadHotels(); }, [loadHotels]);
 
+  // Libera el blob URL local cuando ya no se necesita, para no dejar fugas
+  // de memoria (cada vez que se elige una imagen nueva o se desmonta el form).
+  useEffect(() => {
+    return () => {
+      if (mainImagePreview && mainImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(mainImagePreview);
+      }
+    };
+  }, [mainImagePreview]);
+
   const processedHotels = useMemo(() => {
     let result = hotels.filter((h) => {
       const searchLower = searchTerm.trim().toLowerCase();
       // Filtrando por los campos reales de MongoDB (name, address)
-      const matchesSearch = searchLower === '' || 
+      const matchesSearch = searchLower === '' ||
         (h.name && h.name.toLowerCase().includes(searchLower)) ||
         (h.address && h.address.toLowerCase().includes(searchLower));
-        
+
       const matchesCat = filterCategory ? h.category === filterCategory : true;
       return matchesSearch && matchesCat;
     });
@@ -134,11 +149,6 @@ function AdminHoteles({ onNavigate }) {
   const [draftError, setDraftError] = useState('');
   const [coords, setCoords] = useState({ lat: null, lng: null });
 
-  const { isLoaded: isMapsLoaded, loadError: mapsLoadError } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
-  const [autocomplete, setAutocomplete] = useState(null);
 
   const startEditingHotel = (hotel) => {
     setEditingId(hotel.id || hotel._id); // MongoDB usa _id por defecto
@@ -147,7 +157,7 @@ function AdminHoteles({ onNavigate }) {
       category: hotel.category || '',
       address: hotel.address || '',
     });
-    
+
     // Extrayendo coordenadas del formato GeoJSON de MongoDB [lng, lat]
     const lng = hotel.location?.coordinates?.[0] ?? null;
     const lat = hotel.location?.coordinates?.[1] ?? null;
@@ -158,14 +168,21 @@ function AdminHoteles({ onNavigate }) {
     );
     setRooms(
       Array.isArray(hotel.rooms) && hotel.rooms.length
-        ? hotel.rooms.map((r, i) => ({ 
-            id: r._id || `existing-${i}`, 
-            name: r.name || '', 
-            details: r.details || '', 
-            pricePerNight: r.pricePerNight || '' 
+        ? hotel.rooms.map((r, i) => ({
+            id: r._id || `existing-${i}`,
+            name: r.name || '',
+            details: r.details || '',
+            pricePerNight: r.pricePerNight || ''
           }))
         : []
     );
+
+    // Si el hotel ya tiene una imagen guardada, se muestra como preview.
+    // mainImage (el File) queda en null porque no se ha elegido un archivo
+    // nuevo todavía — solo se sube algo si el admin selecciona uno distinto.
+    setMainImage(null);
+    setMainImagePreview(hotel.mainImage ? resolveMediaUrl(hotel.mainImage) : null);
+
     setSubmitStatus('idle');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -178,6 +195,8 @@ function AdminHoteles({ onNavigate }) {
     setRooms([]);
     setTouched({ name: false, category: false, address: false });
     setErrors({ name: '', category: '', address: '' });
+    setMainImage(null);
+    setMainImagePreview(null);
   };
 
   const confirmDeleteHotel = async () => {
@@ -189,21 +208,18 @@ function AdminHoteles({ onNavigate }) {
       setHotels((prev) => prev.filter((h) => (h.id || h._id) !== targetId));
       if (editingId === targetId) cancelEditing();
       setDeleteTarget(null);
+      showToast('Hotel eliminado correctamente.');
     } catch (err) {
-      setRoomsError(err instanceof ApiError ? err.message : 'No pudimos eliminar el hotel.');
+      const msg = err instanceof ApiError ? err.message : 'No pudimos eliminar el hotel.';
+      setRoomsError(msg);
+      showToast(msg, 'error');
     } finally {
       setDeletingHotel(false);
     }
   };
 
-  const handlePlaceChanged = () => {
-    if (!autocomplete) return;
-    const place = autocomplete.getPlace();
-    if (!place || !place.geometry || !place.geometry.location) return;
-
-    const lat = place.geometry.location.lat();
-    const lng = place.geometry.location.lng();
-    const formattedAddress = place.formatted_address || place.name || '';
+  const handleAddressSelected = ({ lat, lng, address, name }) => {
+    const formattedAddress = address || name || '';
 
     setCoords({ lat, lng });
     setValues((prev) => ({ ...prev, address: formattedAddress }));
@@ -228,7 +244,7 @@ function AdminHoteles({ onNavigate }) {
 
   const toggleAmenity = (key) => setSelectedAmenities((prev) => ({ ...prev, [key]: !prev[key] }));
   const removeRoom = (id) => setRooms((prev) => prev.filter((r) => r.id !== id));
-  
+
   const updateRoomField = (id, field) => (e) => {
     const value = e.target.value;
     setRooms((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
@@ -239,15 +255,31 @@ function AdminHoteles({ onNavigate }) {
     setIsAddRoomModalOpen(true);
   };
 
+  const cancelAddRoom = () => {
+    setNewRoomName('');
+    setIsAddRoomModalOpen(false);
+  };
+
   const confirmAddRoom = () => {
     if (newRoomName && newRoomName.trim() !== '') {
       setRooms((prev) => [
-        ...prev, 
+        ...prev,
         { id: Date.now(), name: newRoomName.trim(), details: '', pricePerNight: '' }
       ]);
       setRoomsError('');
     }
     setIsAddRoomModalOpen(false);
+  };
+
+  // Maneja la selección del archivo de imagen principal desde el input.
+  // Genera un preview local inmediato (blob URL) sin esperar a subirlo.
+  const handleMainImageChange = (e) => {
+    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+    if (mainImagePreview && mainImagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(mainImagePreview);
+    }
+    setMainImage(file);
+    setMainImagePreview(file ? URL.createObjectURL(file) : null);
   };
 
   const inputClasses = (field) =>
@@ -275,6 +307,18 @@ function AdminHoteles({ onNavigate }) {
     };
   };
 
+  // Sube la imagen principal seleccionada (si hay una) para el hotel ya
+  // creado/editado. Se llama después de createHotel/updateHotel porque el
+  // endpoint de imágenes necesita el _id del hotel y usa multipart/form-data,
+  // no JSON. Si no se eligió ningún archivo nuevo, no hace nada.
+  const uploadPendingImageIfAny = async (hotelId) => {
+    if (!mainImage || !hotelId) return;
+    await hotelService.uploadHotelImages(hotelId, { mainImageFile: mainImage });
+    // Fuerza que todas las <img> de la app vuelvan a pedir la imagen en vez
+    // de servir la versión en caché del navegador.
+    bumpMediaCacheVersion();
+  };
+
   const handleRegister = async () => {
     const newErrors = {
       name: validateHotelField('name', values.name),
@@ -285,9 +329,9 @@ function AdminHoteles({ onNavigate }) {
     setTouched({ name: true, category: true, address: true });
 
     const roomsMsg = rooms.length === 0 ? 'Agrega al menos un tipo de habitación.' : '';
-    const roomPriceMsg = rooms.some(r => !r.pricePerNight || Number(r.pricePerNight) <= 0) 
+    const roomPriceMsg = rooms.some(r => !r.pricePerNight || Number(r.pricePerNight) <= 0)
         ? 'Todas las habitaciones deben tener un precio válido.' : '';
-    
+
     setRoomsError(roomsMsg || roomPriceMsg);
 
     const hasErrors = Object.values(newErrors).some((e) => e !== '') || !!roomsMsg || !!roomPriceMsg;
@@ -300,12 +344,18 @@ function AdminHoteles({ onNavigate }) {
 
     setSubmitStatus('saving');
     try {
+      let hotelId = editingId;
       if (editingId) {
         await hotelService.updateHotel(editingId, payload);
       } else {
-        await hotelService.createHotel(payload);
+        const created = await hotelService.createHotel(payload);
+        hotelId = created?.hotel?._id || created?._id || null;
       }
+
+      await uploadPendingImageIfAny(hotelId);
+
       setSubmitStatus('success');
+      showToast(editingId ? 'Cambios guardados correctamente.' : 'Hotel registrado correctamente.');
       loadHotels();
       setTimeout(() => {
         setSubmitStatus('idle');
@@ -313,7 +363,9 @@ function AdminHoteles({ onNavigate }) {
       }, 1500);
     } catch (err) {
       setSubmitStatus('idle');
-      setRoomsError(err instanceof ApiError ? err.message : 'Error al guardar el hotel.');
+      const msg = err instanceof ApiError ? err.message : 'Error al guardar el hotel.';
+      setRoomsError(msg);
+      showToast(msg, 'error');
     }
   };
 
@@ -330,19 +382,31 @@ function AdminHoteles({ onNavigate }) {
     setDraftStatus('saving');
     setDraftError('');
     try {
+      let hotelId = editingId;
       if (editingId) {
         await hotelService.updateHotel(editingId, payload);
       } else {
-        await hotelService.createHotel(payload);
+        const created = await hotelService.createHotel(payload);
+        hotelId = created?.hotel?._id || created?._id || null;
       }
+
+      await uploadPendingImageIfAny(hotelId);
+
       setDraftStatus('success');
+      showToast('Hotel guardado como borrador.', 'warning');
       loadHotels();
       setTimeout(() => setDraftStatus('idle'), 2000);
     } catch (err) {
       setDraftStatus('idle');
-      setDraftError(err instanceof ApiError ? err.message : 'Error al guardar el borrador.');
+      const msg = err instanceof ApiError ? err.message : 'Error al guardar el borrador.';
+      setDraftError(msg);
+      showToast(msg, 'error');
     }
   };
+
+  // Sube la página al tope al abrir los modales de eliminar o de agregar habitación.
+  useScrollToTopOnOpen(!!deleteTarget);
+  useScrollToTopOnOpen(isAddRoomModalOpen);
 
   return (
     <AdminLayout activePage="admin-hoteles" onNavigate={onNavigate}>
@@ -371,7 +435,7 @@ function AdminHoteles({ onNavigate }) {
 
       {/* --- Lista Avanzada de Hoteles --- */}
       <div className="bg-surface border border-solid border-outline-variant/40 rounded-2xl shadow-sm overflow-hidden mb-8">
-        
+
         <div className="p-5 border-0 border-b border-solid border-outline-variant/40 bg-surface-container-lowest/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="bg-surface-container-high text-on-surface w-10 h-10 rounded-lg flex items-center justify-center">
@@ -382,7 +446,7 @@ function AdminHoteles({ onNavigate }) {
               <p className="text-xs text-on-surface-variant font-medium">Gestiona tu inventario actual</p>
             </div>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <div className="relative w-full sm:w-64">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
@@ -417,14 +481,14 @@ function AdminHoteles({ onNavigate }) {
               ))}
             </div>
           )}
-          
+
           {hotelsStatus === 'error' && (
             <div className="p-8 text-center">
               <span className="material-symbols-outlined text-4xl text-error mb-2">error</span>
               <p className="text-sm font-bold text-error">Hubo un problema al cargar el inventario.</p>
             </div>
           )}
-          
+
           {hotelsStatus === 'ready' && processedHotels.length === 0 && (
             <div className="p-10 text-center flex flex-col items-center">
               <div className="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center mb-4">
@@ -434,23 +498,31 @@ function AdminHoteles({ onNavigate }) {
               <p className="text-xs text-on-surface-variant mt-1">Intenta con otro término de búsqueda.</p>
             </div>
           )}
-          
+
           {hotelsStatus === 'ready' && currentHotels.length > 0 && (
             <div className="divide-y divide-outline-variant/30">
               {currentHotels.map((h) => {
                 // Parseando categorías como "5 estrellas" para mostrar los íconos
                 const starsCount = parseInt(h.category) || 0;
-                
+
                 // Mongoose Virtual Property (h.startingPrice)
                 const price = h.startingPrice != null ? h.startingPrice : (h.rooms?.[0]?.pricePerNight || null);
 
                 return (
                   <div key={h.id || h._id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 py-5 hover:bg-surface-container-lowest/40 transition-colors group">
                     <div className="flex items-start gap-4">
-                      <div className="hidden sm:flex w-12 h-12 rounded-xl bg-surface-container-high text-on-surface-variant items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined">apartment</span>
+                      <div className="hidden sm:flex w-12 h-12 rounded-xl bg-surface-container-high text-on-surface-variant items-center justify-center shrink-0 overflow-hidden">
+                        {h.mainImage ? (
+                          <img
+                            src={resolveMediaUrl(h.mainImage)}
+                            alt={h.name || 'Hotel'}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="material-symbols-outlined">apartment</span>
+                        )}
                       </div>
-                      
+
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-sm font-bold text-on-surface">{h.name || 'Hotel sin nombre'}</h3>
@@ -458,7 +530,7 @@ function AdminHoteles({ onNavigate }) {
                             <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[10px] font-bold uppercase tracking-wide">Inactivo / Borrador</span>
                           )}
                         </div>
-                        
+
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
                           {starsCount > 0 ? (
                             <div className="flex items-center text-yellow-500">
@@ -475,14 +547,14 @@ function AdminHoteles({ onNavigate }) {
                             <span className="truncate max-w-[200px]">{h.address || 'Sin ubicación'}</span>
                           </p>
                         </div>
-                        
+
                         <div className="flex items-center gap-2 text-xs font-medium text-on-surface-variant">
                           <span className="material-symbols-outlined text-[16px]">bed</span>
                           {Array.isArray(h.rooms) ? `${h.rooms.length} Tipos de habitación` : '0 Habitaciones'}
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-6 border-t border-solid border-outline-variant/30 sm:border-0 pt-4 sm:pt-0 mt-2 sm:mt-0">
                       <div className="text-right">
                         <p className="text-[11px] text-on-surface-variant uppercase tracking-wider font-bold mb-0.5">Precio Desde</p>
@@ -490,7 +562,7 @@ function AdminHoteles({ onNavigate }) {
                           {price ? `$${price.toLocaleString('es-MX')}` : '--'} <span className="text-xs font-medium text-on-surface-variant">/noche</span>
                         </p>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => startEditingHotel(h)}
@@ -565,7 +637,7 @@ function AdminHoteles({ onNavigate }) {
                 />
                 {errors.name && touched.name && <p className="text-xs text-error">{errors.name}</p>}
               </div>
-              
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Categoría</label>
                 <select
@@ -584,34 +656,17 @@ function AdminHoteles({ onNavigate }) {
                 </select>
                 {errors.category && touched.category && <p className="text-xs text-error">{errors.category}</p>}
               </div>
-              
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Dirección Completa</label>
-                {isMapsLoaded && !mapsLoadError ? (
-                  <Autocomplete
-                    onLoad={setAutocomplete}
-                    onPlaceChanged={handlePlaceChanged}
-                    options={{ fields: ['formatted_address', 'name', 'geometry'] }}
-                  >
-                    <input
-                      type="text"
-                      placeholder="Empieza a escribir para buscar en Maps..."
-                      className={inputClasses('address')}
-                      value={values.address}
-                      onChange={handleChange('address')}
-                      onBlur={handleBlur('address')}
-                    />
-                  </Autocomplete>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="Calle, número, ciudad, código postal..."
-                    className={inputClasses('address')}
-                    value={values.address}
-                    onChange={handleChange('address')}
-                    onBlur={handleBlur('address')}
-                  />
-                )}
+                <AddressAutocomplete
+                  onSelect={handleAddressSelected}
+                  placeholder="Empieza a escribir para buscar la dirección..."
+                  className={inputClasses('address')}
+                  value={values.address}
+                  onChange={handleChange('address')}
+                  onBlur={handleBlur('address')}
+                />
                 {coords.lat !== null && coords.lng !== null && (
                   <p className="text-xs text-green-500 font-medium flex items-center gap-1">
                     <span className="material-symbols-outlined text-[14px]">check_circle</span>
@@ -666,11 +721,11 @@ function AdminHoteles({ onNavigate }) {
                 Añadir Tipo
               </button>
             </div>
-            
+
             <p className="text-xs text-on-surface-variant mb-4">
               Haz clic en los campos para editar. Define un precio válido por noche (el precio más bajo determinará el costo general del hotel).
             </p>
-            
+
             <div className="space-y-3">
               {rooms.map((room) => (
                 <div key={room.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-solid border-outline-variant/40 rounded-xl bg-surface-container-lowest/50 hover:bg-surface-container-lowest transition-colors group shadow-sm">
@@ -724,17 +779,32 @@ function AdminHoteles({ onNavigate }) {
         <div className="space-y-6">
           <div className="bg-surface border border-solid border-outline-variant/40 rounded-2xl shadow-sm p-6">
             <h3 className="text-base font-bold text-on-surface mb-4">Galería de Imágenes</h3>
-            <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-outline-variant rounded-xl py-8 px-4 text-center cursor-pointer hover:bg-surface-container-high transition-colors mb-3 group">
-              <span className="material-symbols-outlined text-on-surface-variant text-3xl group-hover:scale-110 transition-transform">cloud_upload</span>
-              <span className="text-sm font-semibold text-on-surface">
-                {mainImage ? mainImage.name : (<>Arrastre o haga clic para subir<br />la imagen principal</>)}
-              </span>
-              <span className="text-[11px] text-on-surface-variant">Soporta JPG, PNG (Max 5MB)</span>
+            <label className="relative flex flex-col items-center justify-center gap-2 border-2 border-dashed border-outline-variant rounded-xl py-8 px-4 text-center cursor-pointer hover:bg-surface-container-high transition-colors mb-3 group overflow-hidden">
+              {mainImagePreview ? (
+                <>
+                  <img
+                    src={mainImagePreview}
+                    alt="Vista previa de la imagen principal"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="text-white text-xs font-bold uppercase tracking-wider">Cambiar imagen</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-on-surface-variant text-3xl group-hover:scale-110 transition-transform">cloud_upload</span>
+                  <span className="text-sm font-semibold text-on-surface">
+                    {mainImage ? mainImage.name : (<>Arrastre o haga clic para subir<br />la imagen principal</>)}
+                  </span>
+                  <span className="text-[11px] text-on-surface-variant">Soporta JPG, PNG, WEBP, GIF (Max 5MB)</span>
+                </>
+              )}
               <input
                 type="file"
                 className="hidden"
-                accept="image/png, image/jpeg"
-                onChange={(e) => setMainImage(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+                accept="image/png, image/jpeg, image/webp, image/gif"
+                onChange={handleMainImageChange}
               />
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -792,7 +862,7 @@ function AdminHoteles({ onNavigate }) {
               'Publicar Hotel'
             )}
           </button>
-          
+
           <button
             type="button"
             onClick={handleSaveDraft}

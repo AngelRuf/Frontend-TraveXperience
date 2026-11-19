@@ -22,166 +22,184 @@ function Header({ isLoggedIn = false, onNavigate, currentPage = 'landing', curre
     }
   };
 
+  const getNavClasses = (isActive) => `
+    text-[11px] font-black uppercase tracking-[2px] px-5 py-2.5 rounded-full transition-all duration-300
+    ${isActive 
+      ? 'bg-[#F4B400] text-[#0F1B2D] shadow-[0_4px_15px_rgba(244,180,0,0.3)]' 
+      : 'text-white/70 hover:text-white hover:bg-white/10'
+    }
+  `;
+
+  const getIconBtnClasses = (isActive) => `
+    relative w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 border shadow-sm cursor-pointer
+    ${isActive 
+      ? 'bg-[#F4B400] text-[#0F1B2D] shadow-[0_4px_15px_rgba(244,180,0,0.3)] border-transparent scale-105' 
+      : 'bg-white/5 text-white border-white/10 hover:scale-105 hover:bg-white/10 hover:border-white/20'
+    }
+  `;
+
   return (
-    <header className="fixed top-0 w-full bg-primary/95 backdrop-blur-xl border-0 border-b border-solid border-white/10 z-50">
-      <div className="flex justify-between items-center max-w-[1280px] mx-auto px-6 md:px-16 h-20">
+    <header className="fixed top-0 w-full bg-[#0F1B2D]/95 dark:bg-black/80 backdrop-blur-2xl border-b border-white/10 z-50 transition-colors duration-500">
+      <div className="flex justify-between items-center max-w-[1280px] mx-auto px-6 md:px-16 h-24">
         
         {/* Logo & Navigation */}
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-10">
           <span 
             onClick={handleLogoClick}
-            className="flex items-center gap-2 cursor-pointer selection:bg-transparent"
+            className="flex items-center gap-3 cursor-pointer selection:bg-transparent"
           >
             <img 
-              src="/logo_transparente.png" 
+              src="/src/assets/logo_transparente.png" 
               alt="TraveXperience" 
               className="h-12 w-12 object-contain"
             />
-            <span className="font-display-lg text-2xl font-bold text-on-primary tracking-tighter">
+            <span className="font-display-lg text-2xl font-black text-white tracking-tighter">
               TraveXperience
             </span>
           </span>
           
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden lg:flex items-center gap-2">
             {isLoggedIn && (
-              // Authenticated Links
               <>
                 <a 
                   onClick={(e) => handleNavClick(e, 'inicio')}
-                  className={`font-sans text-sm font-semibold tracking-wide pb-1 transition-all ${
-                    currentPage === 'inicio' 
-                      ? 'text-secondary-container border-0 border-b-2 border-solid border-secondary-container' 
-                      : 'text-on-primary/70 hover:text-on-primary'
-                  }`} 
+                  className={getNavClasses(currentPage === 'inicio')} 
                   href="#explore"
                 >
                   Explorar
                 </a>
                 <a 
                   onClick={(e) => handleNavClick(e, 'mapa')}
-                  className={`font-sans text-sm font-semibold tracking-wide pb-1 transition-all ${
-                    currentPage === 'mapa' 
-                      ? 'text-secondary-container border-0 border-b-2 border-solid border-secondary-container' 
-                      : 'text-on-primary/70 hover:text-on-primary'
-                  }`} 
+                  className={getNavClasses(currentPage === 'mapa')} 
                   href="#mapa"
                 >
                   Mapa 
                 </a>
                 <a 
                   onClick={(e) => handleNavClick(e, 'itinerario')}
-                  className={`font-sans text-sm font-semibold tracking-wide pb-1 transition-all ${
-                    currentPage === 'itinerario' 
-                      ? 'text-secondary-container border-0 border-b-2 border-solid border-secondary-container' 
-                      : 'text-on-primary/70 hover:text-on-primary'
-                  }`} 
+                  className={getNavClasses(currentPage === 'itinerario')} 
                   href="#itinerario"
                 >
                   Mis viajes
                 </a>
                 <a 
                   onClick={(e) => handleNavClick(e, 'settings', { tab: 'Favorites' })}
-                  className={`font-sans text-sm font-semibold tracking-wide pb-1 transition-all ${
-                    currentPage === 'settings' && currentTab === 'Favorites'
-                      ? 'text-secondary-container border-0 border-b-2 border-solid border-secondary-container' 
-                      : 'text-on-primary/70 hover:text-on-primary'
-                  }`} 
+                  className={getNavClasses(currentPage === 'settings' && currentTab === 'Favorites')} 
                   href="#favorites"
                 >
                   Favoritos
                 </a>
               </>
             )}
+            <a
+              onClick={(e) => handleNavClick(e, 'clima')}
+              className={getNavClasses(currentPage === 'clima')}
+              href="#clima"
+            >
+              Clima
+            </a>
+            <a
+              onClick={(e) => handleNavClick(e, 'zonas-riesgo')}
+              className={getNavClasses(currentPage === 'zonas-riesgo')}
+              href="#zonas-riesgo"
+            >
+              Riesgos
+            </a>
           </nav>
         </div>
 
         {/* CTA or Utility Buttons */}
         <div className="flex items-center gap-4">
           {!isLoggedIn ? (
-            // Logged Out Actions
             <>
+              {/* Botón Tema Oscuro / Claro */}
               <button 
                 onClick={toggleTheme}
-                className="p-2 text-on-primary/80 hover:text-on-primary hover:bg-on-primary/10 rounded-full transition-all bg-transparent border-none cursor-pointer"
+                className={getIconBtnClasses(false)}
                 title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
               >
-                <span className="material-symbols-outlined text-[20px]">{isDark ? 'light_mode' : 'dark_mode'}</span>
+                <span className="material-symbols-outlined text-[20px]">
+                  {isDark ? 'light_mode' : 'dark_mode'}
+                </span>
               </button>
+
               <button 
                 onClick={() => onNavigate('login')}
-                className="hidden md:block text-on-primary font-sans text-sm font-semibold tracking-wide bg-transparent border-none cursor-pointer px-4 py-2 hover:bg-on-primary/10 rounded-lg transition-all"
+                className="hidden md:block text-[11px] font-black uppercase tracking-[2px] text-white/70 hover:text-white transition-all bg-transparent border-none cursor-pointer px-4 py-2 hover:bg-white/10 rounded-full"
               >
                 Iniciar sesión
               </button>
+              
               <button 
                 onClick={() => onNavigate('register')}
-                className="bg-yellow-400 text-blue-950 font-sans text-sm font-semibold tracking-wide border-none cursor-pointer px-6 py-3 rounded-lg hover:bg-yellow-500 active:scale-95 transition-all"
+                className="bg-[#F4B400] text-[#0F1B2D] text-[11px] font-black uppercase tracking-[2px] border-none cursor-pointer px-8 py-3.5 rounded-full hover:scale-105 shadow-[0_8px_20px_rgba(244,180,0,0.3)] active:scale-95 transition-all"
               >
                 Comenzar
               </button>
             </>
           ) : (
-            // Logged In Utilities
             <>
+              {/* Botón Tema */}
               <button 
                 onClick={toggleTheme}
-                className="p-2 text-on-primary/80 hover:text-on-primary hover:bg-on-primary/10 rounded-full transition-all bg-transparent border-none cursor-pointer"
+                className={getIconBtnClasses(false)}
                 title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
               >
-                <span className="material-symbols-outlined text-[20px]">{isDark ? 'light_mode' : 'dark_mode'}</span>
+                <span className="material-symbols-outlined text-[20px]">
+                  {isDark ? 'light_mode' : 'dark_mode'}
+                </span>
               </button>
-              {/* Notificaciones */}
-                <button
-                  onClick={() => onNavigate('settings', { tab: 'Notifications' })}
-                  className={`relative w-10 h-10 flex items-center justify-center rounded-full
-                    transition-all duration-200 border-none cursor-pointer
-                    material-symbols-outlined
-                    ${
-                      currentPage === 'settings' && currentTab === 'Notifications'
-                        ? 'bg-yellow-400 text-black shadow-md scale-110'
-                        : 'bg-transparent text-on-primary/80 hover:text-on-primary hover:bg-on-primary/10'
-                    }`}
-                  title="Notificaciones"
-                >
-                  notifications
 
-                  {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-yellow-400 border border-solid border-primary" />
-                  )}
-                </button>
+              {/* Botón Notificaciones */}
+              <button
+                onClick={() => onNavigate('settings', { tab: 'Notifications' })}
+                className={getIconBtnClasses(currentPage === 'settings' && currentTab === 'Notifications')}
+                title="Notificaciones"
+              >
+                <span className="material-symbols-outlined text-[22px]">notifications</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[#EF4444] border-2 border-[#0F1B2D] dark:border-black text-white text-[9px] font-black px-1">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
 
-                {/* Configuración */}
-                <button
-                  onClick={() => onNavigate('settings', { tab: 'Personal Info' })}
-                  className={`w-10 h-10 flex items-center justify-center rounded-full
-                    transition-all duration-200 border-none cursor-pointer
-                    material-symbols-outlined
-                    ${
-                      currentPage === 'settings' && currentTab === 'Personal Info'
-                        ? 'bg-yellow-400 text-black shadow-md scale-110'
-                        : 'bg-transparent text-on-primary/80 hover:text-on-primary hover:bg-on-primary/10'
-                    }`}
-                  title="Configuración"
-                >
-                  settings
-                </button>
+              {/* Botón Configuración */}
+              <button
+                onClick={() => onNavigate('settings', { tab: 'Personal Info' })}
+                className={getIconBtnClasses(currentPage === 'settings' && currentTab === 'Personal Info')}
+                title="Configuración"
+              >
+                <span className="material-symbols-outlined text-[22px]">settings</span>
+              </button>
+
+              {/* Avatar Perfil */}
               <div 
                 onClick={() => onNavigate('settings', { tab: 'Personal Info' })}
-                className="w-10 h-10 rounded-full overflow-hidden border-2 border-solid border-on-primary/20 cursor-pointer hover:border-secondary-container transition-all bg-secondary-container flex items-center justify-center"
-                title="Configuración de perfil"
+                className={`w-12 h-12 ml-2 rounded-full overflow-hidden border-2 cursor-pointer transition-all flex items-center justify-center shadow-md
+                  ${currentPage === 'settings' && currentTab === 'Personal Info' 
+                    ? 'border-[#F4B400] scale-105' 
+                    : 'border-white/20 hover:border-[#F4B400]'
+                  }
+                  ${!user?.avatar ? 'bg-white/10' : ''}
+                `}
+                title="Perfil"
               >
                 {user?.avatar ? (
-                  <img alt={user?.fullName || 'Perfil'} className="w-full h-full object-cover" src={resolveMediaUrl(user.avatar)} />
+                  <img 
+                    alt={user?.fullName || 'Perfil'} 
+                    className="w-full h-full object-cover" 
+                    src={resolveMediaUrl(user.avatar)} 
+                  />
                 ) : (
-                  <span className="text-on-secondary-container font-bold text-sm">
-                    {(user?.fullName || '?').trim().charAt(0).toUpperCase()}
+                  <span className="text-white font-black text-lg uppercase">
+                    {(user?.fullName || '?').trim().charAt(0)}
                   </span>
                 )}
               </div>
             </>
           )}
         </div>
-
       </div>
     </header>
   );

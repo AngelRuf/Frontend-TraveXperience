@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 import * as favoriteService from '../services/favoriteService';
 import { iconForCategory } from '../utils/categoryIcons.js';
+import RiskMapLayer from '../components/RiskMapLayer.jsx';
 import {
   getNearbyPlaces,
   getNearbyHotels,
@@ -17,6 +18,13 @@ import {
   sortCategoriesBeachLast,
   DEFAULT_COORDS,
 } from '../services/placesService';
+import { getNearbyRisks } from '../services/riskService.js';
+import {
+  getTouristPlaces,
+  dedupeAgainstCatalog,
+  OSM_CATEGORY_ICONS,
+  directionsUrl,
+} from '../services/osmService';
 
 // Fix leaflet default icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -54,6 +62,22 @@ function createIcon(color = '#eab308', glyph = 'place') {
 // Colores vibrantes para los marcadores
 const MARKER_COLORS = ['#3b82f6', '#10b981', '#a855f7', '#f43f5e', '#06b6d4'];
 const HOTEL_COLOR = '#eab308'; // Amarillo/Dorado para hoteles
+const OSM_COLOR = '#14b8a6'; // Verde azulado para lugares turísticos de OpenStreetMap
+const OSM_CHIP = 'bg-teal-500/15 text-teal-500 border border-teal-500/30';
+
+// Imagen del lugar, o un degradado con ícono cuando no hay foto (los lugares de OSM casi nunca traen)
+function PlaceImage({ place, glyph, className = '', iconSize = 'text-5xl' }) {
+  const [failed, setFailed] = useState(false);
+  const src = place.hasRealImage === false ? null : place.image;
+  if (src && !failed) {
+    return <img className={className} alt={place.title} src={src} onError={() => setFailed(true)} />;
+  }
+  return (
+    <div className={`${className} bg-gradient-to-br from-teal-600/40 via-teal-500/20 to-yellow-500/20 flex items-center justify-center`}>
+      <span className={`material-symbols-outlined ${iconSize} text-teal-500/80`} style={{ fontVariationSettings: "'FILL' 1" }}>{glyph}</span>
+    </div>
+  );
+}
 
 const CATEGORY_CHIP_COLORS = [
   'bg-blue-500/10 text-blue-500 border border-blue-500/20',
@@ -98,6 +122,10 @@ function InteractiveMap({ onNavigate }) {
   const [coords, setCoords] = useState(null);
   const [categories, setCategories] = useState([]);
   const [places, setPlaces] = useState([]);
+  const [osmPlaces, setOsmPlaces] = useState([]);
+  const [risks, setRisks] = useState([]);
+  const [riskStatus, setRiskStatus] = useState('loading');
+  const mapRef = useRef(null);
   const [status, setStatus] = useState('loading'); 
   const [favError, setFavError] = useState(null);
 
@@ -149,6 +177,24 @@ function InteractiveMap({ onNavigate }) {
   }, []);
 
   useEffect(() => {
+    if (!coords) return undefined;
+    let cancelled = false;
+    setRiskStatus('loading');
+    getNearbyRisks({ lat: coords.lat, lng: coords.lng, radius: 50000 })
+      .then((items) => {
+        if (cancelled) return;
+        setRisks(items);
+        setRiskStatus('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setRiskStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [coords]);
+
+  useEffect(() => {
     let cancelled = false;
     getPlaceCategories().then((cats) => {
       if (!cancelled) setCategories(sortCategoriesBeachLast(cats));
@@ -184,10 +230,26 @@ function InteractiveMap({ onNavigate }) {
     return cleanup;
   }, [loadNearby]);
 
+  // Lugares turísticos de OpenStreetMap (gratis). Si falla, el mapa sigue funcionando con tu catálogo.
+  useEffect(() => {
+    if (!coords) return undefined;
+    const controller = new AbortController();
+    getTouristPlaces({ lat: coords.lat, lng: coords.lng, signal: controller.signal })
+      .then(setOsmPlaces)
+      .catch(() => {});
+    return () => controller.abort();
+  }, [coords]);
+
+  const allPlaces = useMemo(
+    () => [...places, ...dedupeAgainstCatalog(osmPlaces, places)],
+    [places, osmPlaces]
+  );
+
   const filters = useMemo(
     () => [
       { value: 'todo', label: 'Todo el mapa', icon: 'explore' },
       { value: 'hoteles', label: 'Hoteles', icon: 'hotel' },
+      { value: 'osm', label: 'Más lugares turísticos', icon: 'public' },
       ...categories.map((c) => ({ value: c.value, label: c.label, icon: iconForCategory(c.value) })),
     ],
     [categories]
@@ -195,12 +257,13 @@ function InteractiveMap({ onNavigate }) {
 
   const activeFilterObj = filters.find((f) => f.value === activeFilter) || filters[0];
 
-  const filteredPlaces = places.filter((p) => {
+  const filteredPlaces = allPlaces.filter((p) => {
     const matchSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchFilter =
       activeFilter === 'todo' ||
       (activeFilter === 'hoteles' && p.kind === 'hotel') ||
-      p.category === activeFilter;
+      (activeFilter === 'osm' && p.kind === 'osm') ||
+      (p.kind !== 'osm' && p.category === activeFilter);
     return matchSearch && matchFilter;
   });
 
@@ -209,6 +272,7 @@ function InteractiveMap({ onNavigate }) {
   const colorForPlace = useCallback(
     (place, index) => {
       if (place.kind === 'hotel') return HOTEL_COLOR;
+      if (place.kind === 'osm') return OSM_COLOR;
       const catIndex = Math.max(categories.findIndex((c) => c.value === place.category), 0);
       return MARKER_COLORS[catIndex % MARKER_COLORS.length] || MARKER_COLORS[index % MARKER_COLORS.length];
     },
@@ -216,7 +280,12 @@ function InteractiveMap({ onNavigate }) {
   );
 
   const glyphForPlace = useCallback(
-    (place) => (place.kind === 'hotel' ? 'hotel' : iconForCategory(place.category)),
+    (place) =>
+      place.kind === 'hotel'
+        ? 'hotel'
+        : place.kind === 'osm'
+          ? OSM_CATEGORY_ICONS[place.category] || 'place'
+          : iconForCategory(place.category),
     []
   );
 
@@ -228,18 +297,23 @@ function InteractiveMap({ onNavigate }) {
     [categories]
   );
 
-  const tileLayers = {
+    const tileLayers = {
+    // CARTO ya exige API key; se usan las teselas oficiales de OpenStreetMap (sin llave).
+    // El modo oscuro es el mismo mapa con un filtro CSS (clase osm-dark-tiles).
     streets: {
-      url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      className: '',
     },
     dark: {
-      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      className: 'osm-dark-tiles',
     },
     satellite: {
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      attribution: '&copy; Esri',
+      attribution: '&copy; Esri, Maxar, Earthstar Geographics',
+      className: '',
     },
   };
 
@@ -325,6 +399,27 @@ function InteractiveMap({ onNavigate }) {
             )}
           </div>
 
+          <div className="mx-6 mb-4 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest/80 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-black uppercase tracking-wide text-on-surface">Alertas de riesgo</p>
+              <span className="text-xs font-bold text-on-surface-variant">
+                {riskStatus === 'loading' ? 'Consultando…' : riskStatus === 'error' ? 'No disponible' : `${risks.length} avisos`}
+              </span>
+            </div>
+            {riskStatus === 'error' && (
+              <p className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
+                No se pudo consultar la fuente de alertas. No se mostrarán datos no verificados.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => onNavigate?.('zonas-riesgo')}
+              className="mt-3 w-full rounded-xl bg-surface-container-high px-3 py-2 text-xs font-bold text-on-surface transition-colors hover:bg-yellow-500 hover:text-black"
+            >
+              Ver zonas y recomendaciones
+            </button>
+          </div>
+
           {/* Place list */}
           <div className="flex-1 overflow-y-auto no-scrollbar px-6 pb-6 space-y-4 relative z-0">
             {status === 'loading' &&
@@ -339,13 +434,16 @@ function InteractiveMap({ onNavigate }) {
               ))}
 
             {status === 'error' && (
-              <div className="text-center p-8 border border-dashed border-error/40 rounded-3xl bg-error/5">
-                <span className="material-symbols-outlined text-error text-4xl mb-3">cloud_off</span>
-                <p className="text-sm font-bold text-error">Problema de conexión.</p>
+              <div className="text-center p-5 border border-dashed border-error/40 rounded-3xl bg-error/5">
+                <span className="material-symbols-outlined text-error text-3xl mb-2">cloud_off</span>
+                <p className="text-sm font-bold text-error">No pudimos cargar el catálogo de TraveXperience.</p>
+                {filteredPlaces.length > 0 && (
+                  <p className="text-xs text-on-surface-variant mt-1">Mostrando lugares turísticos de OpenStreetMap.</p>
+                )}
               </div>
             )}
 
-            {status === 'ready' && filteredPlaces.length === 0 && (
+            {status !== 'loading' && filteredPlaces.length === 0 && status !== 'error' && (
               <div className="text-center p-8 border border-dashed border-outline-variant/50 rounded-3xl bg-surface-container-lowest/50">
                 <span className="material-symbols-outlined text-outline-variant text-4xl mb-3">location_off</span>
                 <p className="text-sm font-bold text-on-surface">No hay resultados.</p>
@@ -353,7 +451,7 @@ function InteractiveMap({ onNavigate }) {
               </div>
             )}
 
-            {status === 'ready' &&
+            {status !== 'loading' &&
               filteredPlaces.map((place, index) => (
                 <div
                   key={place.id}
@@ -366,9 +464,10 @@ function InteractiveMap({ onNavigate }) {
                   style={{ animationDelay: `${Math.min(index, 10) * 40}ms` }}
                 >
                   <div className="relative h-40">
-                    <img className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={place.title} src={place.image} />
+                    <PlaceImage place={place} glyph={glyphForPlace(place)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-90" />
                     
+                    {!place.readOnly && (<>
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleFavorite(place); }}
                       className={`absolute top-3 left-3 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center transition-all border-none cursor-pointer shadow-md active:scale-90 z-10 ${
@@ -397,8 +496,9 @@ function InteractiveMap({ onNavigate }) {
                     >
                       <span className="material-symbols-outlined text-[18px]">add_task</span>
                     </button>
+                    </>)}
                     
-                    <span className={`absolute bottom-3 left-3 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider z-10 ${chipColorFor(place.category)}`}>
+                    <span className={`absolute bottom-3 left-3 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider z-10 ${place.kind === 'osm' ? OSM_CHIP : chipColorFor(place.category)}`}>
                       {place.kind === 'hotel' ? 'Hotel' : (place.categoryLabel || place.category)}
                     </span>
                   </div>
@@ -406,10 +506,15 @@ function InteractiveMap({ onNavigate }) {
                   <div className="p-4 flex flex-col justify-between">
                     <div>
                       <h3 className="text-sm font-bold text-on-surface leading-tight mb-1 group-hover:text-yellow-500 transition-colors">{place.title}</h3>
-                      <p className="text-[11px] font-medium text-on-surface-variant flex items-center gap-1">
+                      <p className="text-[11px] font-medium text-on-surface-variant flex items-center gap-1 truncate" title={place.address || place.raw?.municipality || ''}>
                         <span className="material-symbols-outlined text-[12px]">location_on</span>
-                        {place.distanceLabel ? place.distanceLabel : 'Sin ubicación exacta'}
+                        <span className="truncate">{place.address || place.raw?.municipality || 'Ubicación no disponible'}</span>
                       </p>
+                      {place.distanceLabel && (
+                        <p className="mt-1 text-[10px] text-on-surface-variant/80">
+                          A {place.distanceLabel}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -420,8 +525,10 @@ function InteractiveMap({ onNavigate }) {
         {/* ── Map Area ── */}
         <main className="flex-1 relative z-0">
           
-          {/* Map style switcher (Glassmorphism Pill) */}
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[400] flex items-center gap-1 bg-surface-container-lowest/80 backdrop-blur-xl p-1.5 rounded-full shadow-lg border border-solid border-outline-variant/50">
+          {/* Map style switcher (Glassmorphism Pill) — movido a la derecha para
+              no tapar la tarjeta del lugar seleccionado, que aparece abajo
+              al centro del mapa. */}
+          <div className="absolute top-6 right-6 z-[400] flex flex-col items-stretch gap-1 bg-surface-container-lowest/80 backdrop-blur-xl p-1.5 rounded-2xl shadow-lg border border-solid border-outline-variant/50">
             {Object.keys(tileLayers).map((style) => {
               const label = style === 'streets' ? 'Claro' : style === 'dark' ? 'Oscuro' : 'Satélite';
               const icon = style === 'streets' ? 'light_mode' : style === 'dark' ? 'dark_mode' : 'satellite_alt';
@@ -432,7 +539,7 @@ function InteractiveMap({ onNavigate }) {
                     userPickedStyleRef.current = true;
                     setMapStyle(style);
                   }}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer border-none ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border-none whitespace-nowrap ${
                     mapStyle === style
                       ? 'bg-on-surface text-surface shadow-md'
                       : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
@@ -446,20 +553,24 @@ function InteractiveMap({ onNavigate }) {
           </div>
 
           <MapContainer
+            ref={mapRef}
             center={center}
             zoom={15}
-            style={{ height: '100%', width: '100%' }}
+            style={{ height: '100%', width: '100%', zIndex: 0 }}
             zoomControl={false}
           >
             <TileLayer
               key={mapStyle}
               url={tileLayers[mapStyle].url}
               attribution={tileLayers[mapStyle].attribution}
-              maxZoom={20}
+              className={tileLayers[mapStyle].className}
+              maxZoom={19}
+              maxNativeZoom={19}
             />
 
             {coords && <RecenterOnCoords coords={coords} />}
             {selectedPlace && <FlyToMarker place={selectedPlace} />}
+            <RiskMapLayer risks={risks} />
 
             {filteredPlaces
               .filter((place) => place.lat != null && place.lng != null)
@@ -474,7 +585,7 @@ function InteractiveMap({ onNavigate }) {
                     {/* MODIFICACIÓN: Ancho de w-48 a w-72 para que no se vea tan pequeño */}
                     <div className="font-sans w-64 md:w-72 bg-surface rounded-xl overflow-hidden p-0 m-0">
                       {/* MODIFICACIÓN: Aumentada la altura de la imagen a h-32 */}
-                      <img src={place.image} alt={place.title} className="w-full h-32 md:h-36 object-cover" />
+                      <PlaceImage place={place} glyph={glyphForPlace(place)} className="w-full h-32 md:h-36 object-cover" iconSize="text-4xl" />
                       <div className="p-4">
                         {/* MODIFICACIÓN: Título más grande text-base */}
                         <strong className="block text-base font-black text-on-surface leading-tight mb-1.5">{place.title}</strong>
@@ -496,14 +607,14 @@ function InteractiveMap({ onNavigate }) {
           {/* Zoom controls (Glassmorphism) */}
           <div className="absolute right-6 bottom-32 md:bottom-28 flex flex-col gap-3 z-[400]">
             <button
-              onClick={() => document.querySelector('.leaflet-control-zoom-in')?.click()}
+              onClick={() => mapRef.current?.zoomIn()}
               className="w-12 h-12 bg-surface-container-lowest/80 backdrop-blur-xl text-on-surface rounded-2xl shadow-lg flex items-center justify-center hover:bg-surface-container hover:text-yellow-500 transition-colors cursor-pointer border border-outline-variant/40"
               title="Acercar"
             >
               <span className="material-symbols-outlined text-[24px]">add</span>
             </button>
             <button
-              onClick={() => document.querySelector('.leaflet-control-zoom-out')?.click()}
+              onClick={() => mapRef.current?.zoomOut()}
               className="w-12 h-12 bg-surface-container-lowest/80 backdrop-blur-xl text-on-surface rounded-2xl shadow-lg flex items-center justify-center hover:bg-surface-container hover:text-yellow-500 transition-colors cursor-pointer border border-outline-variant/40"
               title="Alejar"
             >
@@ -521,7 +632,7 @@ function InteractiveMap({ onNavigate }) {
               <div className="bg-surface-container-lowest/90 dark:bg-surface-container-lowest/80 backdrop-blur-2xl rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] p-4 flex flex-col sm:flex-row items-center gap-4 border border-outline-variant/40 relative animate-scale-in">
                 
                 <div className="w-full sm:w-24 h-32 sm:h-24 rounded-2xl overflow-hidden flex-shrink-0 relative">
-                  <img className="w-full h-full object-cover" alt={selectedPlace.title} src={selectedPlace.image} />
+                  <PlaceImage place={selectedPlace} glyph={glyphForPlace(selectedPlace)} className="w-full h-full object-cover" iconSize="text-4xl" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                   {selectedPlace.rating && (
                     <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur px-2 py-0.5 rounded-lg text-white">
@@ -542,6 +653,30 @@ function InteractiveMap({ onNavigate }) {
                     )}
                   </div>
                   
+                  {selectedPlace.readOnly ? (
+                    <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 w-full">
+                      <a
+                        href={directionsUrl(selectedPlace.lat, selectedPlace.lng)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-yellow-500 text-black px-5 py-2 rounded-xl text-xs font-bold hover:bg-yellow-400 transition-colors no-underline shadow-md shadow-yellow-500/20"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">directions</span>
+                        Cómo llegar
+                      </a>
+                      {selectedPlace.website && (
+                        <a
+                          href={selectedPlace.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-surface-container-high hover:bg-surface-container-highest text-on-surface rounded-xl text-xs font-bold transition-colors no-underline shadow-sm"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                          Sitio web
+                        </a>
+                      )}
+                    </div>
+                  ) : (
                   <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 w-full">
                     <button
                       onClick={() => {
@@ -562,6 +697,7 @@ function InteractiveMap({ onNavigate }) {
                       <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                     </button>
                   </div>
+                  )}
                 </div>
 
                 <button
@@ -594,6 +730,9 @@ function InteractiveMap({ onNavigate }) {
       
       {/* Estilos globales inyectados para formatear los popups feos por defecto de Leaflet */}
       <style dangerouslySetInnerHTML={{__html: `
+        .osm-dark-tiles {
+          filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.8);
+        }
         .leaflet-popup-content-wrapper {
           padding: 0;
           border-radius: 12px;
@@ -617,14 +756,6 @@ function InteractiveMap({ onNavigate }) {
         }
         .leaflet-container a.leaflet-popup-close-button:hover {
           color: #eab308;
-        }
-        /* Evita que el switcher de Claro/Oscuro/Satélite y los controles de zoom
-           corten o tapen los popups de los marcadores y la tarjeta del lugar. */
-        .leaflet-popup-pane {
-          z-index: 700 !important;
-        }
-        .leaflet-marker-pane {
-          z-index: 600 !important;
         }
       `}} />
     </div>

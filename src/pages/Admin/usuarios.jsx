@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import useModalScrollLock from '../../hooks/useModalScrollLock.jsx';
 import AdminLayout from '../../components/adminLayout.jsx';
-import Toast from '../../components/Toast.jsx';
 import * as adminService from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { resolveMediaUrl, ApiError } from '../../services/apiClient';
+import { useToast } from '../../context/ToastContext.jsx';
+import useScrollToTopOnOpen from '../../hooks/useScrollToTopOnOpen.js';
 
 const PAGE_SIZE = 15;
 const INACTIVITY_OPTIONS = [30, 60, 90, 180];
@@ -50,14 +50,15 @@ function AdminUsuarios({ onNavigate }) {
   const [changingRole, setChangingRole] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); 
   const [deleting, setDeleting] = useState(false);
-
-  useModalScrollLock(Boolean(roleTarget) || Boolean(deleteTarget));
   
-  const [toast, setToast] = useState(null);
-  const [toastError, setToastError] = useState(null);
+  const { showToast } = useToast();
 
   const [inactivityDays, setInactivityDays] = useState(90);
   const [onlyInactive, setOnlyInactive] = useState(false);
+
+  // Sube la página al tope al abrir cualquiera de los dos modales de confirmación.
+  useScrollToTopOnOpen(!!roleTarget);
+  useScrollToTopOnOpen(!!deleteTarget);
 
   // Efecto de Debounce para la búsqueda
   useEffect(() => {
@@ -102,12 +103,12 @@ function AdminUsuarios({ onNavigate }) {
     try {
       await adminService.updateUserRole(roleTarget.id, target);
       setUsers((prev) => prev.map((u) => (u.id === roleTarget.id ? { ...u, role: target } : u)));
-      setToast(
+      showToast(
         `${roleTarget.fullName || roleTarget.email} ahora es ${target === 'administrador' ? 'administrador' : 'usuario'}.`
       );
       setRoleTarget(null);
     } catch (err) {
-      setToastError(err instanceof ApiError ? err.message : 'No pudimos cambiar el rol. Intenta de nuevo.');
+      showToast(err instanceof ApiError ? err.message : 'No pudimos cambiar el rol. Intenta de nuevo.', 'error');
     } finally {
       setChangingRole(false);
     }
@@ -120,10 +121,10 @@ function AdminUsuarios({ onNavigate }) {
       await adminService.deleteUser(deleteTarget.id);
       setUsers((prev) => prev.filter((u) => u.id !== deleteTarget.id));
       setTotal((t) => Math.max(0, t - 1));
-      setToast(`Se eliminó la cuenta de ${deleteTarget.fullName || deleteTarget.email}.`);
+      showToast(`Se eliminó la cuenta de ${deleteTarget.fullName || deleteTarget.email}.`);
       setDeleteTarget(null);
     } catch (err) {
-      setToastError(err instanceof ApiError ? err.message : 'No pudimos eliminar la cuenta. Intenta de nuevo.');
+      showToast(err instanceof ApiError ? err.message : 'No pudimos eliminar la cuenta. Intenta de nuevo.', 'error');
     } finally {
       setDeleting(false);
     }
@@ -471,8 +472,6 @@ function AdminUsuarios({ onNavigate }) {
         </div>
       )}
 
-      <Toast message={toast} type="success" onClose={() => setToast(null)} />
-      <Toast message={toastError} type="error" onClose={() => setToastError(null)} />
     </AdminLayout>
   );
 }

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import useModalScrollLock from '../../hooks/useModalScrollLock.jsx';
 import AdminLayout from '../../components/adminLayout.jsx';
 import * as adminService from '../../services/adminService';
 import { getPlaceCategories, sortCategoriesBeachLast, humanizeCategoryLabel } from '../../services/placesService';
 import { resolveMediaUrl, ApiError, bumpMediaCacheVersion } from '../../services/apiClient';
+import { useToast } from '../../context/ToastContext.jsx';
+import useScrollToTopOnOpen from '../../hooks/useScrollToTopOnOpen.js';
 
 const PAGE_SIZE = 10;
 
@@ -47,14 +48,12 @@ function AdminInventario({ onNavigate }) {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [toast, setToast] = useState(null);
+  const { showToast } = useToast();
 
-  useModalScrollLock(modalOpen || Boolean(deleteTarget));
-  
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast((c) => (c === msg ? null : c)), 3000);
-  };
+  // Sube la página al tope al abrir cualquiera de los dos modales, para que
+  // sean visibles de inmediato sin importar dónde esté el usuario en la lista.
+  useScrollToTopOnOpen(modalOpen);
+  useScrollToTopOnOpen(!!deleteTarget);
 
   useEffect(() => {
     getPlaceCategories().then((cats) => setCategories(sortCategoriesBeachLast(cats)));
@@ -219,7 +218,7 @@ function AdminInventario({ onNavigate }) {
       setDeleteTarget(null);
       loadPlaces();
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : 'Error al eliminar el lugar.');
+      showToast(err instanceof ApiError ? err.message : 'Error al eliminar el lugar.', 'error');
     } finally {
       setDeleting(false);
     }
@@ -740,13 +739,6 @@ function AdminInventario({ onNavigate }) {
         </div>
       )}
 
-      {/* --- Notificaciones Toast --- */}
-      <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 bg-surface-container-highest text-on-surface px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 z-[100] transition-all duration-500 ease-out border border-solid border-outline-variant/50 ${
-        toast ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0 pointer-events-none'
-      }`}>
-        <span className="material-symbols-outlined text-green-500 text-2xl">check_circle</span>
-        <span className="text-sm font-bold">{toast}</span>
-      </div>
     </AdminLayout>
   );
 }

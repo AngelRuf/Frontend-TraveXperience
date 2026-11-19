@@ -17,6 +17,8 @@ import HotelDetail from './pages/infoCards.jsx';
 import Checkout from './pages/pago.jsx';
 import BookingConfirmed from './pages/confirmacionPago.jsx';
 import ResetPassword from './pages/resetContraseña.jsx';
+import Clima from './pages/Clima.jsx';
+import ZonasRiesgo from './pages/ZonasRiesgo.jsx';
 
 //Admin Pages
 import AdminDashboard from './pages/Admin/dashboard.jsx';
@@ -76,7 +78,7 @@ function Home() {
 
       if ([
         'landing', 'login', 'register', 'forgot-password', 'reset-password', 'inicio', 'mapa',
-        'itinerario', 'hotel-detail', 'checkout', 'payment-success',
+        'itinerario', 'hotel-detail', 'checkout', 'payment-success', 'clima', 'zonas-riesgo',
         ...ADMIN_PAGES,
       ].includes(route)) {
         setCurrentPage(route);
@@ -216,6 +218,10 @@ function Home() {
         return <NearMeHome onNavigate={navigate} />;
       case 'mapa':
         return <InteractiveMap onNavigate={navigate} />;
+      case 'clima':
+        return <Clima />;
+      case 'zonas-riesgo':
+        return <ZonasRiesgo />;
       case 'itinerario':
         return <AwayFromHomePlanner onNavigate={navigate} />;
       case 'hotel-detail':

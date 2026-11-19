@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@react-google-maps/api": "^2.20.5",
     "@stripe/react-stripe-js": "^2.9.0",
     "@stripe/stripe-js": "^4.10.0",
     "leaflet": "^1.9.4",
@@ -28,6 +27,7 @@
     "oxlint": "^1.71.0",
     "postcss": "^8.5.16",
     "tailwindcss": "^4.3.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vite-plugin-pwa": "^2.0.0"
   }
 }

@@ -13,6 +13,7 @@
  *   POST   /admin/hotels            -> createHotel(data)  -> Hotel
  *   PUT    /admin/hotels/:id        -> updateHotel(id, data) -> Hotel
  *   DELETE /admin/hotels/:id        -> deleteHotel(id)
+ *   POST   /admin/hotels/:id/images -> uploadHotelImages(id, files) -> Hotel
  *
  *   Hotel esperado (campos que este servicio consume; los demás se
  *   reenvían tal cual vengan):
@@ -42,3 +43,30 @@ export const updateHotel = async (id, data) => api.put(`/admin/hotels/${id}`, da
 
 /** Elimina el hotel completo (y con él, todos sus tipos de habitación) permanentemente. */
 export const deleteHotel = async (id) => api.delete(`/admin/hotels/${id}`);
+
+/**
+ * Sube la imagen principal y/o imágenes adicionales de un hotel ya creado.
+ * Usa multipart/form-data porque el backend (multer, ver utils/upload.js)
+ * espera archivos binarios en los campos "mainImage" e "images", no JSON.
+ * apiClient detecta el FormData automáticamente y deja que el navegador
+ * arme el Content-Type con el boundary correcto — no forzar headers aquí.
+ *
+ * @param {string} id - _id de Mongo del hotel (ya debe existir).
+ * @param {{ mainImageFile?: File, imageFiles?: File[] }} files
+ * @returns {Promise<{hotel: object} | null>} null si no había nada que subir.
+ */
+export const uploadHotelImages = async (id, { mainImageFile, imageFiles } = {}) => {
+  if (!mainImageFile && (!imageFiles || imageFiles.length === 0)) {
+    return null;
+  }
+
+  const formData = new FormData();
+  if (mainImageFile) {
+    formData.append('mainImage', mainImageFile);
+  }
+  if (Array.isArray(imageFiles)) {
+    imageFiles.forEach((file) => formData.append('images', file));
+  }
+
+  return api.post(`/admin/hotels/${id}/images`, formData);
+};

@@ -14,7 +14,7 @@
  * -----------------------------------------------------------------------
  */
 
-export const BASE_URL = import.meta.env.VITE_API_URL || 'http://10.47.9.6:4000/api/v1';
+export const BASE_URL = import.meta.env.VITE_API_URL || 'http://10.247.110.6:4000/api/v1';
 
 // El backend sirve archivos subidos (avatar, fotos de lugares/hoteles) como
 // rutas relativas tipo "/uploads/profiles/avatar-123.jpg" — servidas en la

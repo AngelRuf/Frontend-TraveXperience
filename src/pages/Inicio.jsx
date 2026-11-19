@@ -9,6 +9,7 @@ import * as favoriteService from '../services/favoriteService';
 import { useAuth } from '../context/AuthContext.jsx';
 import { iconForCategory } from '../utils/categoryIcons.js';
 import Toast from '../components/Toast.jsx';
+import SafeImage from '../components/SafeImage.jsx';
 
 function NearMeHome({ onNavigate }) {
   const { isLoggedIn } = useAuth();
@@ -224,7 +225,7 @@ function NearMeHome({ onNavigate }) {
 
                     {/* Header Imagen */}
                     <div className="relative h-48 sm:h-52 overflow-hidden bg-surface-container-highest shrink-0 z-0">
-                      <img 
+                      <SafeImage
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
                         alt={place.title} 
                         src={place.image} 

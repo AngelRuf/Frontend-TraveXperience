@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import useModalScrollLock from '../hooks/useModalScrollLock.jsx';
 import * as itineraryService from '../services/itineraryService';
+import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen.js';
 
 /** "14:30" (input type=time) -> "2:30 PM" (formato que usa el itinerario). */
 function to12Hour(time24h) {
@@ -24,7 +24,9 @@ function AddToItineraryModal({ place, userId, isOpen, onClose, onAdded }) {
   const [addingNewDay, setAddingNewDay] = useState(false);
   const [newDayTitle, setNewDayTitle] = useState('');
 
-  useModalScrollLock(isOpen);
+  // Sube la página al tope al abrir este modal, sin importar desde qué
+  // pantalla se dispare (Mapa, ficha de detalle, itinerario, etc.).
+  useScrollToTopOnOpen(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,7 +55,7 @@ function AddToItineraryModal({ place, userId, isOpen, onClose, onAdded }) {
 
   return (
     <div className="fixed inset-0 z-[1100] bg-primary/40 backdrop-blur-md flex items-start justify-center px-4 pt-20 pb-6 overflow-y-auto no-scrollbar animate-fade-in">
-      <div className="bg-surface-container-lowest w-full max-w-sm rounded-2xl shadow-2xl p-7 animate-scale-in border border-solid border-outline-variant/30">
+      <div className="bg-surface-container-lowest w-full max-w-sm rounded-2xl shadow-2xl p-7 animate-scale-in">
         <div className="flex items-start justify-between gap-3 mb-1">
           <div className="flex items-center gap-3 min-w-0">
             {place.image && (

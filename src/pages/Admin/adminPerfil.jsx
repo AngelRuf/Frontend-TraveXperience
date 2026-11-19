@@ -3,6 +3,7 @@ import AdminLayout from '../../components/adminLayout.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import * as authService from '../../services/authService';
 import { ApiError, resolveMediaUrl, bumpMediaCacheVersion } from '../../services/apiClient';
+import { useToast } from '../../context/ToastContext.jsx';
 
 const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ\s]{3,60}$/;
 const PHONE_REGEX = /^[0-9+\s()-]{7,20}$/;
@@ -49,6 +50,7 @@ const ROLE_LABELS = { admin: 'Administrador', user: 'Usuario' };
 
 function AdminPerfil({ onNavigate }) {
   const { user, refreshProfile } = useAuth();
+  const { showToast } = useToast();
 
   const [values, setValues] = useState({
     fullName: '',
@@ -186,12 +188,15 @@ function AdminPerfil({ onNavigate }) {
 
       await refreshProfile();
       setSaveStatus('success');
+      showToast('Perfil actualizado correctamente.');
       setValues((prev) => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
       setTouched((prev) => ({ ...prev, currentPassword: false, newPassword: false, confirmPassword: false }));
       setTimeout(() => setSaveStatus((s) => (s === 'success' ? 'idle' : s)), 3000);
     } catch (err) {
       setSaveStatus('error');
-      setSaveError(err instanceof ApiError ? err.message : 'No se pudo guardar. Intenta de nuevo.');
+      const msg = err instanceof ApiError ? err.message : 'No se pudo guardar. Intenta de nuevo.';
+      setSaveError(msg);
+      showToast(msg, 'error');
     } finally {
       setIsSaving(false);
     }

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../components/adminLayout.jsx';
 import { AdminErrorBanner } from '../../components/adminAsyncState.jsx';
 import { getSettings, updateSettings, classifyAdminError } from '../../services/adminService';
+import { useToast } from '../../context/ToastContext.jsx';
 
 // Toggle Moderno estilo SaaS
 function Toggle({ checked, onChange }) {
@@ -92,6 +93,7 @@ function fromApi(settings) {
 
 function ConfiguracionesAdmin({ onNavigate }) {
   const [values, setValues] = useState(DEFAULT_VALUES);
+  const { showToast } = useToast();
   const [toggles, setToggles] = useState(DEFAULT_TOGGLES);
   const [errors, setErrors] = useState({ siteName: '', supportEmail: '', commission: '', refundWindow: '' });
   const [touched, setTouched] = useState({ siteName: false, supportEmail: false, commission: false, refundWindow: false });
@@ -172,11 +174,13 @@ function ConfiguracionesAdmin({ onNavigate }) {
         ...toggles,
       });
       setSaveStatus('success');
+      showToast('Configuración guardada correctamente.');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (err) {
       const info = classifyAdminError(err);
       setSaveStatus('error');
       setSaveError(info.message);
+      showToast(info.message, 'error');
       if (info.type === 'unauthorized') setErrorInfo(info);
     }
   };

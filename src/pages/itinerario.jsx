@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import useModalScrollLock from '../hooks/useModalScrollLock.jsx';
+import Modal from '../components/Modal.jsx';
 import WeatherWidget from '../components/WeatherWidget.jsx';
 import { getNearbyPlaces, getPlaceCategories, sortCategoriesBeachLast, getCurrentPosition } from '../services/placesService';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -8,6 +8,7 @@ import * as itineraryService from '../services/itineraryService';
 import * as aiService from '../services/aiService';
 import AddToItineraryModal from '../components/AddToItineraryModal.jsx';
 import Toast from '../components/Toast.jsx';
+import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen.js';
 
 const BENTO_SIZES = ['col-span-2 row-span-1', 'col-span-1 row-span-1', 'col-span-1 row-span-1'];
 
@@ -18,6 +19,21 @@ const categoryColors = {
   Hospedaje: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
   Actividad: 'bg-purple-500/10 text-purple-400 border border-purple-500/20',
 };
+
+// Hook local: resetea el scrollTop del CONTENEDOR del modal (no el de window)
+// cada vez que el modal pasa de cerrado -> abierto.
+function useModalScrollReset(isOpen, ref) {
+  useEffect(() => {
+    if (!isOpen) return;
+    // rAF para asegurar que el nodo ya está montado en el DOM
+    const raf = requestAnimationFrame(() => {
+      if (ref.current) {
+        ref.current.scrollTop = 0;
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isOpen, ref]);
+}
 
 function AwayFromHomePlanner({ onNavigate }) {
   const { user } = useAuth();
@@ -30,7 +46,7 @@ function AwayFromHomePlanner({ onNavigate }) {
 
   const [filters, setFilters] = useState([{ value: 'todo', label: 'Todo' }]);
   const [destinations, setDestinations] = useState([]);
-  const [destStatus, setDestStatus] = useState('loading'); 
+  const [destStatus, setDestStatus] = useState('loading');
 
   const [trips, setTrips] = useState(() => itineraryService.getTrips(userId));
   const [trip, setTrip] = useState(() => itineraryService.getTrip(userId));
@@ -63,6 +79,7 @@ function AwayFromHomePlanner({ onNavigate }) {
   const [showTripMetaEditor, setShowTripMetaEditor] = useState(false);
   const [tripMetaDraft, setTripMetaDraft] = useState({ title: '', startDate: '', endDate: '', travelers: 1, budget: '' });
   const [saveToast, setSaveToast] = useState(null);
+  const [saveToastType, setSaveToastType] = useState('success');
 
   const [budgetEstimate, setBudgetEstimate] = useState(null);
   const [budgetEstimateStatus, setBudgetEstimateStatus] = useState('idle');
@@ -70,7 +87,7 @@ function AwayFromHomePlanner({ onNavigate }) {
   useEffect(() => {
     if (!showTripMetaEditor) return;
     if (!tripMetaDraft.startDate || !tripMetaDraft.endDate) return;
-    if (tripMetaDraft.budget) return; 
+    if (tripMetaDraft.budget) return;
 
     const days = Math.max(
       1,
@@ -169,10 +186,17 @@ function AwayFromHomePlanner({ onNavigate }) {
 
   const [eventModalTarget, setEventModalTarget] = useState(null);
 
-  const modalOpenCount =
-    Number(showAddDayModal) + Number(showTripMetaEditor) + Number(showNewTripModal) + (eventModalTarget ? 1 : 0);
-
-  useModalScrollLock(modalOpenCount > 0);
+  // El bloqueo de scroll del body y el "subir al tope" para CADA modal de esta
+  // página lo maneja únicamente useScrollToTopOnOpen (ver más abajo, junto a
+  // las otras llamadas al hook). Antes existía aquí un segundo mecanismo que
+  // hacía exactamente lo mismo sobre el mismo window.__openModalCount, y las
+  // dos implementaciones se pisaban entre sí: cada apertura de modal sumaba +2
+  // al contador global en vez de +1, así que en ciertas secuencias de abrir/
+  // cerrar el contador nunca volvía a 0 y document.body.style.overflow se
+  // quedaba en 'hidden' para siempre — afectando el scroll de TODA la app,
+  // no solo de esta página, porque el <body> nunca se recarga en la SPA.
+  // No lo reintroduzcas aquí; si un modal nuevo necesita este comportamiento,
+  // agrégale su propia llamada a useScrollToTopOnOpen(isOpenDeEseModal).
 
   const handleAddEventToActiveDay = (place) => {
     setEventModalTarget(place);
@@ -188,6 +212,7 @@ function AwayFromHomePlanner({ onNavigate }) {
       icon: 'add_task',
       iconBg: 'bg-green-500/10 text-green-500',
     });
+    setSaveToastType('success');
     setSaveToast(`"${place.title}" se agregó a ${day?.day || 'tu itinerario'}.`);
   };
 
@@ -236,6 +261,7 @@ function AwayFromHomePlanner({ onNavigate }) {
       icon: 'save',
       iconBg: 'bg-blue-500/10 text-blue-500',
     });
+    setSaveToastType('warning');
     setSaveToast(`"${trip.title}" se guardó como borrador.`);
   };
 
@@ -263,6 +289,23 @@ function AwayFromHomePlanner({ onNavigate }) {
     }
   };
 
+  // Sube la página al tope al abrir cualquiera de los 3 modales del itinerario.
+  useScrollToTopOnOpen(showNewTripModal);
+  useScrollToTopOnOpen(showAddDayModal);
+  useScrollToTopOnOpen(showTripMetaEditor);
+  useScrollToTopOnOpen(!!eventModalTarget);
+
+  // Refs a los contenedores de cada modal (el div fixed/overflow-y-auto).
+  // Estos son los que realmente tienen el scroll interno que se queda "hasta abajo".
+  const newTripModalRef = useRef(null);
+  const addDayModalRef = useRef(null);
+  const tripMetaModalRef = useRef(null);
+
+  // Resetea el scrollTop del contenedor de cada modal al abrirse.
+  useModalScrollReset(showNewTripModal, newTripModalRef);
+  useModalScrollReset(showAddDayModal, addDayModalRef);
+  useModalScrollReset(showTripMetaEditor, tripMetaModalRef);
+
   return (
     <div className="min-h-screen bg-background text-on-background font-sans flex flex-col relative">
 
@@ -270,7 +313,7 @@ function AwayFromHomePlanner({ onNavigate }) {
       <section className="relative pt-24 pb-12 px-4 md:px-16 overflow-hidden bg-surface-container-lowest border-b border-outline-variant/20">
         <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-yellow-500/10 blur-[100px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-blue-500/5 blur-[80px] pointer-events-none translate-y-1/3 -translate-x-1/3" />
-        
+
         <div className="relative max-w-[1400px] mx-auto z-10 flex flex-col justify-start items-start gap-6 md:pl-16 xl:pl-20">
           <div>
             <span className="inline-flex items-center gap-1.5 text-xs font-bold tracking-widest uppercase text-yellow-500 mb-3 bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">
@@ -340,7 +383,7 @@ function AwayFromHomePlanner({ onNavigate }) {
                     src={dest.image}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
-                  
+
                   <button
                     onClick={(e) => { e.stopPropagation(); handleAddEventToActiveDay(dest); }}
                     title={`Agregar a ${trip.days[activeDay]?.day || 'este día'}`}
@@ -454,7 +497,7 @@ function AwayFromHomePlanner({ onNavigate }) {
                 <span className="material-symbols-outlined text-[16px] text-yellow-500 opacity-0 group-hover/dates:opacity-100 transition-opacity ml-2">edit</span>
               </button>
             </div>
-            
+
             <div className="flex flex-row md:flex-col gap-3 flex-shrink-0 relative z-10 w-full md:w-auto">
               <button
                 onClick={handleReserve}
@@ -498,7 +541,7 @@ function AwayFromHomePlanner({ onNavigate }) {
 
           {/* Timeline Workspace */}
           <div className="bg-surface border border-outline-variant/30 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col min-h-[500px]">
-            
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 border-b border-outline-variant/20 pb-6">
               <div>
                 <h3 className="text-2xl font-black text-on-surface tracking-tight mb-1">
@@ -524,7 +567,7 @@ function AwayFromHomePlanner({ onNavigate }) {
                     <div key={event.id} className="relative group">
                       {/* Timeline Dot */}
                       <div className="absolute -left-[35px] sm:-left-[43px] top-6 w-4 h-4 rounded-full bg-yellow-500 border-4 border-surface z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)] group-hover:scale-125 transition-transform" />
-                      
+
                       {/* Event Card */}
                       <div className="bg-surface border border-outline-variant/40 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row gap-4 sm:gap-5 hover:shadow-lg hover:border-outline-variant hover:-translate-y-1 transition-all duration-300">
                         <div className="w-full sm:w-28 h-32 sm:h-28 rounded-xl overflow-hidden flex-shrink-0 bg-surface-container shadow-inner border border-outline-variant/20">
@@ -559,7 +602,7 @@ function AwayFromHomePlanner({ onNavigate }) {
                       </div>
                     </div>
                   ))}
-                  
+
                   {/* Endpoint visual del timeline */}
                   <div className="relative pt-2">
                     <div className="absolute -left-[35px] sm:-left-[43px] top-4 w-4 h-4 rounded-full bg-surface-container-high border-4 border-surface z-10" />
@@ -586,81 +629,88 @@ function AwayFromHomePlanner({ onNavigate }) {
       {/* --- Modales --- */}
 
       {/* Nuevo Viaje */}
-      {showNewTripModal && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="bg-surface border border-outline-variant/30 rounded-3xl w-full max-w-md p-8 relative shadow-2xl animate-scale-in mt-12 md:mt-20 max-h-[calc(100vh-8rem)] overflow-y-auto">
-            <button onClick={() => setShowNewTripModal(false)} className="absolute top-5 right-5 w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer border-none">
-              <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
-            <div className="w-12 h-12 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center mb-5">
-              <span className="material-symbols-outlined text-[24px]">flight_takeoff</span>
-            </div>
-            <h3 className="text-xl font-bold text-on-surface mb-2">Crear Nuevo Viaje</h3>
-            <p className="text-xs text-on-surface-variant mb-6 leading-relaxed">Organiza múltiples aventuras por separado. Empecemos dándole un nombre a este itinerario.</p>
-            <form onSubmit={handleCreateTrip} className="space-y-5">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider ml-1" htmlFor="new-trip-title">Nombre del viaje</label>
-                <input
-                  id="new-trip-title"
-                  type="text"
-                  autoFocus
-                  required
-                  placeholder="Ej. Fin de semana en familia"
-                  value={newTripTitle}
-                  onChange={(e) => setNewTripTitle(e.target.value)}
-                  className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-bold text-on-surface outline-none focus:border-yellow-500 transition-colors"
-                />
-              </div>
-              <button type="submit" className="w-full bg-yellow-500 text-black py-3.5 rounded-xl text-sm font-bold hover:bg-yellow-400 active:scale-[0.98] transition-all border-none cursor-pointer shadow-md shadow-yellow-500/20">
-                Comenzar a planear
-              </button>
-            </form>
+      <Modal
+        isOpen={showNewTripModal}
+        containerRef={newTripModalRef}
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      >
+        <div className="bg-surface border border-outline-variant/30 rounded-3xl w-full max-w-md p-8 relative shadow-2xl animate-scale-in">
+          <button onClick={() => setShowNewTripModal(false)} className="absolute top-5 right-5 w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer border-none">
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+          <div className="w-12 h-12 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center mb-5">
+            <span className="material-symbols-outlined text-[24px]">flight_takeoff</span>
           </div>
+          <h3 className="text-xl font-bold text-on-surface mb-2">Crear Nuevo Viaje</h3>
+          <p className="text-xs text-on-surface-variant mb-6 leading-relaxed">Organiza múltiples aventuras por separado. Empecemos dándole un nombre a este itinerario.</p>
+          <form onSubmit={handleCreateTrip} className="space-y-5">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider ml-1" htmlFor="new-trip-title">Nombre del viaje</label>
+              <input
+                id="new-trip-title"
+                type="text"
+                autoFocus
+                required
+                placeholder="Ej. Fin de semana en familia"
+                value={newTripTitle}
+                onChange={(e) => setNewTripTitle(e.target.value)}
+                className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-bold text-on-surface outline-none focus:border-yellow-500 transition-colors"
+              />
+            </div>
+            <button type="submit" className="w-full bg-yellow-500 text-black py-3.5 rounded-xl text-sm font-bold hover:bg-yellow-400 active:scale-[0.98] transition-all border-none cursor-pointer shadow-md shadow-yellow-500/20">
+              Comenzar a planear
+            </button>
+          </form>
         </div>
-      )}
+      </Modal>
 
       {/* Nuevo Día */}
-      {showAddDayModal && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="bg-surface border border-outline-variant/30 rounded-3xl w-full max-w-sm p-8 relative shadow-2xl animate-scale-in mt-12 md:mt-20 max-h-[calc(100vh-8rem)] overflow-y-auto">
-            <button onClick={() => setShowAddDayModal(false)} className="absolute top-5 right-5 w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer border-none">
-              <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
-            <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mb-5">
-              <span className="material-symbols-outlined text-[24px]">today</span>
-            </div>
-            <h3 className="text-xl font-bold text-on-surface mb-2">Agregar Día</h3>
-            <p className="text-xs text-on-surface-variant mb-6 leading-relaxed">Añade una nueva pestaña a tu itinerario para organizar más actividades.</p>
-            <form onSubmit={handleAddDay} className="space-y-5">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider ml-1" htmlFor="new-day-title">Etiqueta del día</label>
-                <input
-                  id="new-day-title"
-                  type="text"
-                  autoFocus
-                  required
-                  placeholder={`Ej. Día ${trip.days.length + 1}`}
-                  value={newDayTitle}
-                  onChange={(e) => setNewDayTitle(e.target.value)}
-                  className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-bold text-on-surface outline-none focus:border-blue-500 transition-colors"
-                />
-              </div>
-              <button type="submit" className="w-full bg-blue-500 text-white py-3.5 rounded-xl text-sm font-bold hover:bg-blue-600 active:scale-[0.98] transition-all border-none cursor-pointer shadow-md shadow-blue-500/20">
-                Confirmar
-              </button>
-            </form>
+      <Modal
+        isOpen={showAddDayModal}
+        containerRef={addDayModalRef}
+        className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto"
+      >
+        <div className="bg-surface border border-outline-variant/30 rounded-3xl w-full max-w-sm p-8 relative shadow-2xl animate-scale-in mt-12 md:mt-20 max-h-[calc(100vh-8rem)] overflow-y-auto">
+          <button onClick={() => setShowAddDayModal(false)} className="absolute top-5 right-5 w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer border-none">
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+          <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mb-5">
+            <span className="material-symbols-outlined text-[24px]">today</span>
           </div>
+          <h3 className="text-xl font-bold text-on-surface mb-2">Agregar Día</h3>
+          <p className="text-xs text-on-surface-variant mb-6 leading-relaxed">Añade una nueva pestaña a tu itinerario para organizar más actividades.</p>
+          <form onSubmit={handleAddDay} className="space-y-5">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider ml-1" htmlFor="new-day-title">Etiqueta del día</label>
+              <input
+                id="new-day-title"
+                type="text"
+                autoFocus
+                required
+                placeholder={`Ej. Día ${trip.days.length + 1}`}
+                value={newDayTitle}
+                onChange={(e) => setNewDayTitle(e.target.value)}
+                className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-bold text-on-surface outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+            <button type="submit" className="w-full bg-blue-500 text-white py-3.5 rounded-xl text-sm font-bold hover:bg-blue-600 active:scale-[0.98] transition-all border-none cursor-pointer shadow-md shadow-blue-500/20">
+              Confirmar
+            </button>
+          </form>
         </div>
-      )}
+      </Modal>
 
       {/* Editar Fechas y Meta */}
-      {showTripMetaEditor && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="bg-surface border border-outline-variant/30 rounded-3xl w-full max-w-md p-6 md:p-8 relative shadow-2xl animate-scale-in mt-12 md:mt-20 max-h-[calc(100vh-8rem)] overflow-y-auto">
+      <Modal
+        isOpen={showTripMetaEditor}
+        containerRef={tripMetaModalRef}
+        className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto"
+      >
+        <div className="bg-surface border border-outline-variant/30 rounded-3xl w-full max-w-md p-6 md:p-8 relative shadow-2xl animate-scale-in mt-12 md:mt-20 max-h-[calc(100vh-8rem)] overflow-y-auto">
             <button onClick={() => setShowTripMetaEditor(false)} className="absolute top-5 right-5 w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer border-none">
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
-            
+
             <div className="flex items-center gap-3 mb-6 border-b border-outline-variant/30 pb-4">
               <div className="w-12 h-12 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-[24px]">edit_calendar</span>
@@ -793,10 +843,9 @@ function AwayFromHomePlanner({ onNavigate }) {
               </div>
             </form>
           </div>
-        </div>
-      )}
+      </Modal>
 
-      <Toast message={saveToast} type="success" onClose={() => setSaveToast(null)} />
+      <Toast message={saveToast} type={saveToastType} onClose={() => setSaveToast(null)} />
 
       <AddToItineraryModal
         place={eventModalTarget}

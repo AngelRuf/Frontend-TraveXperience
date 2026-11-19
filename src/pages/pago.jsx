@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import useModalScrollLock from '../hooks/useModalScrollLock.jsx';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import Layout from '../components/Layout.jsx';
 import { createPaymentIntent, getSavedCards } from '../services/paymentService';
 import { ApiError } from '../services/apiClient';
+import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen.js';
 
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
 
@@ -156,7 +156,8 @@ function CheckoutForm({ onNavigate, hotel }) {
   const [savedCards, setSavedCards] = useState([]);
   const [savedCardsStatus, setSavedCardsStatus] = useState('loading');
 
-  useModalScrollLock(status === 'success');
+  // Sube la página al tope cuando aparece el modal de "Pago exitoso".
+  useScrollToTopOnOpen(status === 'success');
 
   // Matemáticas dinámicas para el resumen del pedido
   const total = hotel?.price || 0;
@@ -476,8 +477,8 @@ function CheckoutForm({ onNavigate, hotel }) {
 
       {/* Modal de Éxito Inmersivo */}
       {status === 'success' && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-start justify-center px-4 pt-20 pb-6 animate-fade-in overflow-y-auto">
-          <div className="bg-surface border border-outline-variant/30 p-10 md:p-14 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] text-center max-w-md mx-auto transform transition-transform duration-500 scale-100 animate-scale-in relative overflow-hidden mt-12 md:mt-20 max-h-[calc(100vh-8rem)] overflow-y-auto">
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center px-4 animate-fade-in">
+          <div className="bg-surface border border-outline-variant/30 p-10 md:p-14 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] text-center max-w-md mx-auto transform transition-transform duration-500 scale-100 animate-scale-in relative overflow-hidden">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
             
             <div className="w-24 h-24 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 relative z-10 shadow-inner border border-green-500/30">
